@@ -41,6 +41,17 @@ cv::Mat get_screenshot(Display *display, const Rect &rect) {
     }
   }
 
+  // Cursor位置
+  Window root_return, child_return;
+  int root_x_return, root_y_return, win_x_return, win_y_return;
+  unsigned int mask_return;
+
+  XQueryPointer(display, RootWindow(display, DefaultScreen(display)),
+                &root_return, &child_return, &root_x_return, &root_y_return,
+                &win_x_return, &win_y_return, &mask_return);
+  std::cerr << root_x_return << " " << root_y_return << std::endl;
+  cv::Point cursor(root_x_return - rect.x, root_y_return - rect.y);
+  cv::circle(mat, cursor, 5, cv::Scalar(0, 0, 255, 255), -1);
   XDestroyImage(image);
 
   return mat;
