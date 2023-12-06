@@ -76,6 +76,9 @@ std::string get_window_title(Display *display, Window window) {
                      &bytes_after_return, &name);
 
   // 文字列に変換
+  if (name == nullptr) {
+    return "";
+  }
   std::string title((char *)name);
 
   // 後処理
@@ -96,14 +99,12 @@ int main() {
     auto now = std::chrono::system_clock::now();
     std::time_t end_time = std::chrono::system_clock::to_time_t(now);
 
-    std::cerr << std::ctime(&end_time) << std::endl;
-
     Window window = get_active_window(display);
     const Rect rect = get_window_rect(display, window);
-    std::cerr << "rect: (" << rect.x << ", " << rect.y << ", " << rect.width
-              << ", " << rect.height << ")" << std::endl;
     const std::string title = get_window_title(display, window);
-    std::cerr << "title: " << title << std::endl;
+    std::cerr << std::ctime(&end_time) << " " << title // time and title
+              << "\trect: (" << rect.x << ", " << rect.y << ", " << rect.width
+              << ", " << rect.height << ")\n" << std::endl;
 
     const std::string key = "将棋所";
     const std::size_t pos = title.find(key);
