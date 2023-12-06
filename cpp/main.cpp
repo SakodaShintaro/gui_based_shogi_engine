@@ -21,15 +21,15 @@ void move_cursor(Display *display, int x, int y) {
   XWarpPointer(display, None, DefaultRootWindow(display), 0, 0, 0, 0, x, y);
 }
 
-cv::Mat get_screenshot(Display *display, int x, int y, int width, int height) {
+cv::Mat get_screenshot(Display *display, const Rect &rect) {
   XImage *image =
-      XGetImage(display, RootWindow(display, DefaultScreen(display)), x, y,
-                width, height, AllPlanes, ZPixmap);
+      XGetImage(display, RootWindow(display, DefaultScreen(display)), rect.x,
+                rect.y, rect.width, rect.height, AllPlanes, ZPixmap);
 
-  cv::Mat mat(height, width, CV_8UC4);
+  cv::Mat mat(rect.height, rect.width, CV_8UC4);
 
-  for (int y = 0; y < height; y++) {
-    for (int x = 0; x < width; x++) {
+  for (int y = 0; y < rect.height; y++) {
+    for (int x = 0; x < rect.width; x++) {
 
       unsigned long pixel = XGetPixel(image, x, y);
 
@@ -110,8 +110,7 @@ int main() {
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }
 
-  cv::Mat image =
-      get_screenshot(display, rect.x, rect.y, rect.width, rect.height);
+  const cv::Mat image = get_screenshot(display, rect);
 
   cv::imwrite("screenshot.png", image);
 
