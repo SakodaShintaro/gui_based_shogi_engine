@@ -219,6 +219,15 @@ int main()
     print_tensor_info(image_tensor);
     torch::Tensor out = nn->forward(image_tensor);
     print_tensor_info(out);
+    out = out.squeeze(0);  // [1, 5, 5] -> [5, 5]
+
+    // out[5, 5]をmove[5, 4]とscore[5, 1]に分ける
+    torch::Tensor move = out.slice(1, 0, 4);
+    move = torch::sigmoid(move);
+    torch::Tensor score = out.slice(1, 4, 5);
+    torch::Tensor softmax_score = torch::softmax(score, 0);
+    std::cerr << "move: " << move << std::endl;
+    std::cerr << "softmax_score: " << softmax_score << std::endl;
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }

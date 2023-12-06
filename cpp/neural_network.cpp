@@ -34,25 +34,26 @@ NeuralNetworkImpl::NeuralNetworkImpl()
   conv5_ = register_module("conv5", MyConv2d(64, 64));
   fc1_ = register_module("fc1", Linear(64 * 21 * 31, 512));
   fc2_ = register_module("fc2", Linear(512, 512));
-  fc3_ = register_module("fc3", Linear(512, 4));
+  fc3_ = register_module("fc3", Linear(512, action_dim * action_num));
 }
 
 torch::Tensor NeuralNetworkImpl::forward(torch::Tensor input)
 {
-  torch::Tensor x = input;              // [3, 691, 1016]
-  x = torch::relu(conv1_->forward(x));  // [32, 691, 1016]
-  x = torch::max_pool2d(x, 2, 2);       // [32, 345, 508]
-  x = torch::relu(conv2_->forward(x));  // [64, 345, 508]
-  x = torch::max_pool2d(x, 2, 2);       // [64, 172, 254]
-  x = torch::relu(conv3_->forward(x));  // [64, 172, 254]
-  x = torch::max_pool2d(x, 2, 2);       // [64, 86, 127]
-  x = torch::relu(conv4_->forward(x));  // [64, 86, 127]
-  x = torch::max_pool2d(x, 2, 2);       // [64, 43, 63]
-  x = torch::relu(conv5_->forward(x));  // [64, 43, 63]
-  x = torch::max_pool2d(x, 2, 2);       // [64, 21, 31]
-  x = x.flatten(1);                     // [64 * 21 * 31]
-  x = torch::relu(fc1_->forward(x));    // [512]
-  x = torch::relu(fc2_->forward(x));    // [512]
-  x = fc3_->forward(x);                 // [4]
+  torch::Tensor x = input;                   // [bs, 3, 691, 1016]
+  x = torch::relu(conv1_->forward(x));       // [bs, 32, 691, 1016]
+  x = torch::max_pool2d(x, 2, 2);            // [bs, 32, 345, 508]
+  x = torch::relu(conv2_->forward(x));       // [bs, 64, 345, 508]
+  x = torch::max_pool2d(x, 2, 2);            // [bs, 64, 172, 254]
+  x = torch::relu(conv3_->forward(x));       // [bs, 64, 172, 254]
+  x = torch::max_pool2d(x, 2, 2);            // [bs, 64, 86, 127]
+  x = torch::relu(conv4_->forward(x));       // [bs, 64, 86, 127]
+  x = torch::max_pool2d(x, 2, 2);            // [bs, 64, 43, 63]
+  x = torch::relu(conv5_->forward(x));       // [bs, 64, 43, 63]
+  x = torch::max_pool2d(x, 2, 2);            // [bs, 64, 21, 31]
+  x = x.flatten(1);                          // [bs, 64 * 21 * 31]
+  x = torch::relu(fc1_->forward(x));         // [bs, 512]
+  x = torch::relu(fc2_->forward(x));         // [bs, 512]
+  x = fc3_->forward(x);                      // [bs, action_dim * action_num]
+  x = x.view({-1, action_dim, action_num});  // [bs, action_dim, action_num]
   return x;
 }
