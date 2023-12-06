@@ -1,7 +1,7 @@
 #include <chrono>
 #include <iostream>
-#include <thread>
 #include <random>
+#include <thread>
 
 #include <opencv2/opencv.hpp>
 
@@ -169,20 +169,27 @@ int main() {
     }
 
     // ランダムにカーソル位置を変える
-    std::uniform_int_distribution<> rand_x(0, rect.width * 2 / 3);
-    std::uniform_int_distribution<> rand_y(20, rect.height * 2 / 3);
-    const int rx = rand_x(mt);
-    const int ry = rand_y(mt);
-    std::cerr << "rx: " << rx << " ry: " << ry << std::endl;
+    // 将棋所の将棋盤の範囲内でランダムにカーソルを動かす
+    // ウィンドウ左上を原点としたときの盤面の範囲 x[10, 570] y[60, 500]
+    std::uniform_int_distribution<> rand_x(10, 570);
+    std::uniform_int_distribution<> rand_y(60, 500);
+    const int rx_catch = rand_x(mt);
+    const int ry_catch = rand_y(mt);
+    std::cerr << "rx_catch: " << rx_catch << " ry_catch: " << ry_catch
+              << std::endl;
 
     // 掴む
-    move_cursor(display, rect.x + rx, rect.y + ry);
+    move_cursor(display, rect.x + rx_catch, rect.y + ry_catch);
     XSync(display, false);
     mouse_click(display, 1);
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // 離す
-    move_cursor(display, rect.x + rx, rect.y + ry - 30);
+    const int rx_release = rand_x(mt);
+    const int ry_release = rand_y(mt);
+    std::cerr << "rx_release: " << rx_release << " ry_release: " << ry_release
+              << std::endl;
+    move_cursor(display, rect.x + rx_release, rect.y + ry_release);
     XSync(display, false);
     mouse_click(display, 1);
 
