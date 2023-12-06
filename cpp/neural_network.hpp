@@ -3,6 +3,9 @@
 
 #include <torch/torch.h>
 
+// [上, 右, 下, 左, クリック]
+enum Action { kUp, kRight, kDown, kLeft, kClick, kActionSize };
+
 // 画像を入力として行動を出力するニューラルネットワーク
 class NeuralNetworkImpl : public torch::nn::Module
 {
@@ -13,9 +16,6 @@ public:
   torch::Tensor forward(torch::Tensor input);
 
 private:
-  // [上, 右, 下, 左, クリック]
-  static constexpr int64_t action_dim = 5;
-
   // 畳み込み層
   torch::nn::Conv2d conv1_ = nullptr;
   torch::nn::Conv2d conv2_ = nullptr;

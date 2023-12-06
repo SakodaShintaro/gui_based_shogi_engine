@@ -34,7 +34,7 @@ NeuralNetworkImpl::NeuralNetworkImpl()
   conv5_ = register_module("conv5", MyConv2d(64, 64));
   fc1_ = register_module("fc1", Linear(64 * 21 * 31, 512));
   fc2_ = register_module("fc2", Linear(512, 512));
-  fc3_ = register_module("fc3", Linear(512, action_dim));
+  fc3_ = register_module("fc3", Linear(512, kActionSize));
 }
 
 torch::Tensor NeuralNetworkImpl::forward(torch::Tensor input)
@@ -53,6 +53,6 @@ torch::Tensor NeuralNetworkImpl::forward(torch::Tensor input)
   x = x.flatten(1);                     // [bs, 64 * 21 * 31]
   x = torch::relu(fc1_->forward(x));    // [bs, 512]
   x = torch::relu(fc2_->forward(x));    // [bs, 512]
-  x = fc3_->forward(x);                 // [bs, action_dim]
+  x = fc3_->forward(x);                 // [bs, kActionSize]
   return x;
 }
