@@ -1,6 +1,7 @@
 #include <chrono>
 #include <iostream>
 #include <thread>
+#include <random>
 
 #include <opencv2/opencv.hpp>
 
@@ -19,6 +20,36 @@ struct Rect {
 void move_cursor(Display *display, int x, int y) {
   std::cerr << "move_cursor (" << x << ", " << y << ")" << std::endl;
   XWarpPointer(display, None, DefaultRootWindow(display), 0, 0, 0, 0, x, y);
+}
+
+void mouse_click(Display *display, int button) {
+  std::cerr << "mouse_click" << std::endl;
+  XButtonEvent event;
+  event.type = ButtonPress;
+  event.button = button;
+  event.same_screen = True;
+
+  XQueryPointer(display, RootWindow(display, DefaultScreen(display)),
+                &event.root, &event.window, &event.x_root, &event.y_root,
+                &event.x, &event.y, &event.state);
+
+  event.subwindow = event.window;
+
+  while (event.subwindow) {
+    event.window = event.subwindow;
+    XQueryPointer(display, event.window, &event.root, &event.subwindow,
+                  &event.x_root, &event.y_root, &event.x, &event.y,
+                  &event.state);
+  }
+
+  XSendEvent(display, PointerWindow, True, 0xfff, (XEvent *)&event);
+  XFlush(display);
+
+  event.type = ButtonRelease;
+  event.state = 0x100;
+
+  XSendEvent(display, PointerWindow, True, 0xfff, (XEvent *)&event);
+  XFlush(display);
 }
 
 cv::Mat get_screenshot(Display *display, const Rect &rect) {
@@ -113,6 +144,8 @@ int main() {
     return 1;
   }
 
+  std::mt19937 mt(std::random_device{}());
+
   while (true) {
     auto now = std::chrono::system_clock::now();
     std::time_t end_time = std::chrono::system_clock::to_time_t(now);
@@ -135,15 +168,28 @@ int main() {
       continue;
     }
 
+    // ランダムにカーソル位置を変える
+    std::uniform_int_distribution<> rand_x(0, rect.width * 2 / 3);
+    std::uniform_int_distribution<> rand_y(20, rect.height * 2 / 3);
+    const int rx = rand_x(mt);
+    const int ry = rand_y(mt);
+    std::cerr << "rx: " << rx << " ry: " << ry << std::endl;
+
+    // 掴む
+    move_cursor(display, rect.x + rx, rect.y + ry);
+    XSync(display, false);
+    mouse_click(display, 1);
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // 離す
+    move_cursor(display, rect.x + rx, rect.y + ry - 30);
+    XSync(display, false);
+    mouse_click(display, 1);
+
     const cv::Mat image = get_screenshot(display, rect);
     cv::imwrite("screenshot.png", image);
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
-  }
-
-  for (int64_t i = 0; i < 5; i++) {
-    move_cursor(display, 10, 10);
-    XSync(display, false);
   }
 
   XCloseDisplay(display);
