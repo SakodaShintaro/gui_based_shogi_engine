@@ -13,9 +13,8 @@ public:
   torch::Tensor forward(torch::Tensor input);
 
 private:
-  // [移動前の座標x, y, 移動後の座標x, y, スコア]
-  static const int64_t action_dim = 5;
-  static const int64_t action_num = 5;
+  // [上, 右, 下, 左, クリック]
+  static constexpr int64_t action_dim = 5;
 
   // 畳み込み層
   torch::nn::Conv2d conv1_ = nullptr;
