@@ -92,27 +92,32 @@ int main() {
     return 1;
   }
 
-  Window window = get_active_window(display);
-  const Rect rect = get_window_rect(display, window);
+  while (true) {
+    Window window = get_active_window(display);
+    const Rect rect = get_window_rect(display, window);
+    std::cerr << "window: " << window << std::endl;
+    std::cerr << "rect: (" << rect.x << ", " << rect.y << ", " << rect.width
+              << ", " << rect.height << ")" << std::endl;
+    const std::string title = get_window_title(display, window);
+    std::cerr << "title: " << title << std::endl;
 
-  std::cerr << "window: " << window << std::endl;
-  std::cerr << "rect: (" << rect.x << ", " << rect.y << ", " << rect.width
-            << ", " << rect.height << ")" << std::endl;
+    const std::string key = "将棋所";
+    const std::size_t pos = title.find(key);
+    if (pos == std::string::npos) {
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+      continue;
+    }
 
-  const std::string title = get_window_title(display, window);
-  std::cerr << "title: " << title << std::endl;
-
-  for (int64_t i = 0; i < 5; i++) {
-    move_cursor(display, 10, 10);
-
-    XSync(display, false);
+    const cv::Mat image = get_screenshot(display, rect);
+    cv::imwrite("screenshot.png", image);
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }
 
-  const cv::Mat image = get_screenshot(display, rect);
-
-  cv::imwrite("screenshot.png", image);
+  for (int64_t i = 0; i < 5; i++) {
+    move_cursor(display, 10, 10);
+    XSync(display, false);
+  }
 
   XCloseDisplay(display);
 }
