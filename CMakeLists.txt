@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(mouse_control_cpp)
+project(gui_based_shogi_engine)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "-march=native -Wall")
