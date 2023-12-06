@@ -109,9 +109,10 @@ int main() {
     Window window = get_active_window(display);
     const Rect rect = get_window_rect(display, window);
     const std::string title = get_window_title(display, window);
-    std::cerr << std::ctime(&end_time) << " " << title // time and title
+    std::cerr << "\n"
+              << std::ctime(&end_time) << " " << title // time and title
               << "\trect: (" << rect.x << ", " << rect.y << ", " << rect.width
-              << ", " << rect.height << ")\n" << std::endl;
+              << ", " << rect.height << ")" << std::endl;
 
     const std::string key = "将棋所";
     const std::size_t pos = title.find(key);
