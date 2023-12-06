@@ -52,6 +52,18 @@ void mouse_click(Display * display, int button)
   XFlush(display);
 }
 
+cv::Point get_current_cursor_position(Display * display)
+{
+  Window root_return, child_return;
+  int root_x_return, root_y_return, win_x_return, win_y_return;
+  unsigned int mask_return;
+
+  XQueryPointer(
+    display, RootWindow(display, DefaultScreen(display)), &root_return, &child_return,
+    &root_x_return, &root_y_return, &win_x_return, &win_y_return, &mask_return);
+  return cv::Point(root_x_return, root_y_return);
+}
+
 cv::Mat get_screenshot(Display * display, const Rect & rect)
 {
   XImage * image = XGetImage(
@@ -73,16 +85,9 @@ cv::Mat get_screenshot(Display * display, const Rect & rect)
   }
 
   // Cursor位置
-  Window root_return, child_return;
-  int root_x_return, root_y_return, win_x_return, win_y_return;
-  unsigned int mask_return;
-
-  XQueryPointer(
-    display, RootWindow(display, DefaultScreen(display)), &root_return, &child_return,
-    &root_x_return, &root_y_return, &win_x_return, &win_y_return, &mask_return);
-  std::cerr << root_x_return << " " << root_y_return << std::endl;
-  cv::Point cursor(root_x_return - rect.x, root_y_return - rect.y);
-  cv::circle(mat, cursor, 5, cv::Scalar(0, 0, 255), -1);
+  const cv::Point curr_cursor = get_current_cursor_position(display);
+  const cv::Point cursor_in_image(curr_cursor.x - rect.x, curr_cursor.y - rect.y);
+  cv::circle(mat, cursor_in_image, 5, cv::Scalar(0, 0, 255), -1);
   XDestroyImage(image);
 
   return mat;
