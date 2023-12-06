@@ -93,9 +93,13 @@ int main() {
   }
 
   while (true) {
+    auto now = std::chrono::system_clock::now();
+    std::time_t end_time = std::chrono::system_clock::to_time_t(now);
+
+    std::cerr << std::ctime(&end_time) << std::endl;
+
     Window window = get_active_window(display);
     const Rect rect = get_window_rect(display, window);
-    std::cerr << "window: " << window << std::endl;
     std::cerr << "rect: (" << rect.x << ", " << rect.y << ", " << rect.width
               << ", " << rect.height << ")" << std::endl;
     const std::string title = get_window_title(display, window);
