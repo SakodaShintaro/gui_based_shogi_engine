@@ -60,7 +60,14 @@ Window get_active_window(Display *display) {
 Rect get_window_rect(Display *display, Window window) {
   XWindowAttributes attrs;
   XGetWindowAttributes(display, window, &attrs);
-  return Rect{attrs.x, attrs.y, attrs.width, attrs.height};
+
+  int x, y;
+  Window child;
+  XTranslateCoordinates(display, window,
+                        RootWindow(display, DefaultScreen(display)), 0, 0, &x,
+                        &y, &child);
+
+  return Rect{x, y, attrs.width, attrs.height};
 }
 
 std::string get_window_title(Display *display, Window window) {
