@@ -7,8 +7,12 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
 
 find_package(X11 REQUIRED)
 find_package(OpenCV REQUIRED)
+list(APPEND CMAKE_PREFIX_PATH ../libtorch-2.1.1)
+find_package(Torch REQUIRED)
 
-add_executable(a.out cpp/main.cpp)
+add_executable(a.out
+  cpp/main.cpp
+  cpp/neural_network.cpp)
 
-target_include_directories(a.out PUBLIC ${OpenCV_INCLUDE_DIRS})
-target_link_libraries(a.out ${X11_LIBRARIES} ${OpenCV_LIBS})
+target_include_directories(a.out PUBLIC ${OpenCV_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS} ${TORCH_INCLUDE})
+target_link_libraries(a.out ${X11_LIBRARIES} ${OpenCV_LIBS} ${CUDA_LIBRARIES} ${TORCH_LIBRARIES})

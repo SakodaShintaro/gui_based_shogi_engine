@@ -1,3 +1,6 @@
+#include "cv_mat_to_tensor.hpp"
+#include "neural_network.hpp"
+
 #include <opencv2/opencv.hpp>
 
 #include <chrono>
@@ -61,7 +64,7 @@ cv::Mat get_screenshot(Display * display, const Rect & rect)
     display, RootWindow(display, DefaultScreen(display)), rect.x, rect.y, rect.width, rect.height,
     AllPlanes, ZPixmap);
 
-  cv::Mat mat(rect.height, rect.width, CV_8UC4);
+  cv::Mat mat(rect.height, rect.width, CV_8UC3);
 
   for (int y = 0; y < rect.height; y++) {
     for (int x = 0; x < rect.width; x++) {
@@ -71,7 +74,7 @@ cv::Mat get_screenshot(Display * display, const Rect & rect)
       unsigned char green = (pixel & image->green_mask) >> 8;
       unsigned char red = (pixel & image->red_mask) >> 16;
 
-      mat.at<cv::Vec4b>(y, x) = cv::Vec4b(blue, green, red, 255);
+      mat.at<cv::Vec3b>(y, x) = cv::Vec3b(blue, green, red);
     }
   }
 
@@ -85,7 +88,7 @@ cv::Mat get_screenshot(Display * display, const Rect & rect)
     &root_x_return, &root_y_return, &win_x_return, &win_y_return, &mask_return);
   std::cerr << root_x_return << " " << root_y_return << std::endl;
   cv::Point cursor(root_x_return - rect.x, root_y_return - rect.y);
-  cv::circle(mat, cursor, 5, cv::Scalar(0, 0, 255, 255), -1);
+  cv::circle(mat, cursor, 5, cv::Scalar(0, 0, 255), -1);
   XDestroyImage(image);
 
   return mat;
@@ -152,6 +155,8 @@ int main()
 
   std::mt19937 mt(std::random_device{}());
 
+  NeuralNetwork nn;
+
   while (true) {
     auto now = std::chrono::system_clock::now();
     std::time_t end_time = std::chrono::system_clock::to_time_t(now);
@@ -199,6 +204,9 @@ int main()
 
     const cv::Mat image = get_screenshot(display, rect);
     cv::imwrite("screenshot.png", image);
+
+    torch::Tensor image_tensor = cv_mat_to_tensor(image);
+    std::cout << image_tensor.sizes() << std::endl;
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }
