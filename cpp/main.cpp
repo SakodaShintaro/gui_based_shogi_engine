@@ -144,6 +144,12 @@ std::string get_window_title(Display * display, Window window)
   return title;
 }
 
+void print_tensor_info(const torch::Tensor & tensor)
+{
+  std::cout << "tensor_info: " << tensor.sizes() << " " << tensor.dtype() << " " << tensor.device()
+            << std::endl;
+}
+
 int main()
 {
   Display * display = XOpenDisplay(nullptr);
@@ -155,7 +161,9 @@ int main()
 
   std::mt19937 mt(std::random_device{}());
 
+  const torch::Device device(torch::kCUDA);
   NeuralNetwork nn;
+  nn->to(device);
 
   while (true) {
     auto now = std::chrono::system_clock::now();
@@ -206,7 +214,11 @@ int main()
     cv::imwrite("screenshot.png", image);
 
     torch::Tensor image_tensor = cv_mat_to_tensor(image);
-    std::cout << image_tensor.sizes() << std::endl;
+    image_tensor = image_tensor.unsqueeze(0);
+    image_tensor = image_tensor.to(device);
+    print_tensor_info(image_tensor);
+    torch::Tensor out = nn->forward(image_tensor);
+    print_tensor_info(out);
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }

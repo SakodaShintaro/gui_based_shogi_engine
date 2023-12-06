@@ -20,5 +20,5 @@ torch::Tensor cv_mat_to_tensor(const cv::Mat & cv_img)
   tensor_img = tensor_img.permute({2, 0, 1});   // channels firstに並び替え
   tensor_img = tensor_img.to(torch::kFloat32);  // float32型に変換
 
-  return tensor_img;
+  return tensor_img.clone();
 }
