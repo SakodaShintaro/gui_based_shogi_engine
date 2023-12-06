@@ -6,8 +6,14 @@
 
 #include <chrono>
 #include <iostream>
-#include <random>
 #include <thread>
+
+// ウィンドウ左上を原点としたときの盤面の範囲
+// (10, 60) ~ (570, 500)
+constexpr int kBoardLU_x = 10;
+constexpr int kBoardLU_y = 60;
+constexpr int kBoardRD_x = 570;
+constexpr int kBoardRD_y = 500;
 
 int main()
 {
@@ -17,8 +23,6 @@ int main()
     std::cout << "Cannot open display" << std::endl;
     return 1;
   }
-
-  std::mt19937 mt(std::random_device{}());
 
   const torch::Device device(torch::kCUDA);
   NeuralNetwork nn;
@@ -46,29 +50,6 @@ int main()
       continue;
     }
 
-    // ランダムにカーソル位置を変える
-    // 将棋所の将棋盤の範囲内でランダムにカーソルを動かす
-    // ウィンドウ左上を原点としたときの盤面の範囲 x[10, 570] y[60, 500]
-    std::uniform_int_distribution<> rand_x(10, 570);
-    std::uniform_int_distribution<> rand_y(60, 500);
-    const int rx_catch = rand_x(mt);
-    const int ry_catch = rand_y(mt);
-    std::cerr << "rx_catch: " << rx_catch << " ry_catch: " << ry_catch << std::endl;
-
-    // 掴む
-    warp_cursor(display, rect.x + rx_catch, rect.y + ry_catch);
-    XSync(display, false);
-    mouse_click(display, 1);
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-    // 離す
-    const int rx_release = rand_x(mt);
-    const int ry_release = rand_y(mt);
-    std::cerr << "rx_release: " << rx_release << " ry_release: " << ry_release << std::endl;
-    warp_cursor(display, rect.x + rx_release, rect.y + ry_release);
-    XSync(display, false);
-    mouse_click(display, 1);
-
     const cv::Mat image = get_screenshot(display, rect);
     cv::imwrite("screenshot.png", image);
 
@@ -84,6 +65,28 @@ int main()
     torch::Tensor index_tensor = torch::multinomial(softmax_score, 1);
     const int64_t index = index_tensor[0].item<int64_t>();
     std::cerr << "index = " << index << std::endl;
+
+    constexpr int kUnit = 10;
+    if (index == kClick) {
+      mouse_click(display, 1);
+    } else {
+      cv::Point curr_cursor = get_current_cursor_abs_position(display);
+      if (index == kUp) {
+        curr_cursor.y -= kUnit;
+      } else if (index == kRight) {
+        curr_cursor.x += kUnit;
+      } else if (index == kDown) {
+        curr_cursor.y += kUnit;
+      } else if (index == kLeft) {
+        curr_cursor.x -= kUnit;
+      }
+
+      // 適正な領域内に収める
+      curr_cursor.x = std::clamp(curr_cursor.x, rect.x + kBoardLU_x, rect.x + kBoardRD_x);
+      curr_cursor.y = std::clamp(curr_cursor.y, rect.y + kBoardLU_y, rect.y + kBoardRD_y);
+
+      warp_cursor(display, curr_cursor.x, curr_cursor.y);
+    }
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }

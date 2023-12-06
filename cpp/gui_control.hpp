@@ -52,7 +52,7 @@ void mouse_click(Display * display, int button)
   XFlush(display);
 }
 
-cv::Point get_current_cursor_position(Display * display)
+cv::Point get_current_cursor_abs_position(Display * display)
 {
   Window root_return, child_return;
   int root_x_return, root_y_return, win_x_return, win_y_return;
@@ -85,7 +85,7 @@ cv::Mat get_screenshot(Display * display, const Rect & rect)
   }
 
   // Cursor位置
-  const cv::Point curr_cursor = get_current_cursor_position(display);
+  const cv::Point curr_cursor = get_current_cursor_abs_position(display);
   const cv::Point cursor_in_image(curr_cursor.x - rect.x, curr_cursor.y - rect.y);
   cv::circle(mat, cursor_in_image, 5, cv::Scalar(0, 0, 255), -1);
   XDestroyImage(image);
