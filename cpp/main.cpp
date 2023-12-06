@@ -125,6 +125,9 @@ int main() {
               << "\trect: (" << rect.x << ", " << rect.y << ", " << rect.width
               << ", " << rect.height << ")" << std::endl;
 
+    // Windowのタイトルでいろいろ判断する
+    // TODO:
+    // 成れる指し手を行ったときに「成りますか？」という小さいウィンドウが出ることに注意
     const std::string key = "将棋所";
     const std::size_t pos = title.find(key);
     if (pos == std::string::npos) {
