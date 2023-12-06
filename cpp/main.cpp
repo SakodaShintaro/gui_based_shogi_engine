@@ -28,6 +28,8 @@ int main()
   NeuralNetwork nn;
   nn->to(device);
 
+  torch::optim::Adam optimizer(nn->parameters(), torch::optim::AdamOptions(1e-4));
+
   while (true) {
     auto now = std::chrono::system_clock::now();
     std::time_t end_time = std::chrono::system_clock::to_time_t(now);
@@ -50,25 +52,31 @@ int main()
       continue;
     }
 
-    const cv::Mat image = get_screenshot(display, rect);
-    cv::imwrite("screenshot.png", image);
+    const cv::Mat image_before = get_screenshot(display, rect);
 
-    torch::Tensor image_tensor = cv_mat_to_tensor(image);
+    // Cursor位置追加
+    cv::Mat image_with_cursor = image_before.clone();
+    const cv::Point curr_cursor = get_current_cursor_abs_position(display);
+    const cv::Point cursor_in_image(curr_cursor.x - rect.x, curr_cursor.y - rect.y);
+    cv::circle(image_with_cursor, cursor_in_image, 5, cv::Scalar(0, 0, 255), -1);
+
+    cv::imwrite("screenshot.png", image_with_cursor);
+
+    torch::Tensor image_tensor = cv_mat_to_tensor(image_before);
     image_tensor = image_tensor.unsqueeze(0);
     image_tensor = image_tensor.to(device);
     torch::Tensor out = nn->forward(image_tensor);
     out = out.squeeze(0);  // [1, 5] -> [5]
     torch::Tensor softmax_score = torch::softmax(out, 0);
-    std::cerr << "softmax_score: " << softmax_score << std::endl;
 
     // argmax取得
     torch::Tensor index_tensor = torch::multinomial(softmax_score, 1);
     const int64_t index = index_tensor[0].item<int64_t>();
-    std::cerr << "index = " << index << std::endl;
 
     constexpr int kUnit = 10;
     if (index == kClick) {
       mouse_click(display, 1);
+      std::cerr << "Click!" << std::endl;
     } else {
       cv::Point curr_cursor = get_current_cursor_abs_position(display);
       if (index == kUp) {
@@ -88,7 +96,25 @@ int main()
       warp_cursor(display, curr_cursor.x, curr_cursor.y);
     }
 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    const cv::Mat image_after = get_screenshot(display, rect);
+    cv::imwrite("screenshot2.png", image_after);
+
+    // 画像の差分量を計算
+    cv::Mat diff;
+    cv::absdiff(image_before, image_after, diff);
+    const double diff_norm = cv::norm(cv::sum(diff));
+
+    // 差分を大きくするように強化学習（TODO:流石にこれではまともに動かない）
+    torch::Tensor reward = torch::tensor(diff_norm).to(device);
+    torch::Tensor loss = -torch::log_softmax(out, 0)[index] * reward;
+    std::cerr << "loss: " << loss.item<float>() << std::endl;
+    optimizer.zero_grad();
+    loss.backward();
+    optimizer.step();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
 
   XCloseDisplay(display);

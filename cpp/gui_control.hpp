@@ -19,6 +19,7 @@ struct Rect
 void warp_cursor(Display * display, int x, int y)
 {
   XWarpPointer(display, None, DefaultRootWindow(display), 0, 0, 0, 0, x, y);
+  XSync(display, false);
 }
 
 void mouse_click(Display * display, int button)
@@ -84,10 +85,6 @@ cv::Mat get_screenshot(Display * display, const Rect & rect)
     }
   }
 
-  // Cursor位置
-  const cv::Point curr_cursor = get_current_cursor_abs_position(display);
-  const cv::Point cursor_in_image(curr_cursor.x - rect.x, curr_cursor.y - rect.y);
-  cv::circle(mat, cursor_in_image, 5, cv::Scalar(0, 0, 255), -1);
   XDestroyImage(image);
 
   return mat;
