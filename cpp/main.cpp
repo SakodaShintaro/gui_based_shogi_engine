@@ -63,6 +63,27 @@ Rect get_window_rect(Display *display, Window window) {
   return Rect{attrs.x, attrs.y, attrs.width, attrs.height};
 }
 
+std::string get_window_title(Display *display, Window window) {
+  Atom name_atom = XInternAtom(display, "WM_NAME", False);
+
+  Atom type;
+  unsigned long bytes_after;
+  int len;
+  unsigned long bytes_after_return;
+  unsigned char *name;
+  XGetWindowProperty(display, window, name_atom, 0, 1024, False,
+                     AnyPropertyType, &type, &len, &bytes_after,
+                     &bytes_after_return, &name);
+
+  // 文字列に変換
+  std::string title((char *)name);
+
+  // 後処理
+  XFree(name);
+
+  return title;
+}
+
 int main() {
   Display *display = XOpenDisplay(nullptr);
 
@@ -72,11 +93,14 @@ int main() {
   }
 
   Window window = get_active_window(display);
-  Rect rect = get_window_rect(display, window);
+  const Rect rect = get_window_rect(display, window);
 
   std::cerr << "window: " << window << std::endl;
   std::cerr << "rect: (" << rect.x << ", " << rect.y << ", " << rect.width
             << ", " << rect.height << ")" << std::endl;
+
+  const std::string title = get_window_title(display, window);
+  std::cerr << "title: " << title << std::endl;
 
   for (int64_t i = 0; i < 5; i++) {
     move_cursor(display, 10, 10);
