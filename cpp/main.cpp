@@ -110,7 +110,8 @@ int main() {
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }
 
-  cv::Mat image = get_screenshot(display, 0, 0, 1920, 1080);
+  cv::Mat image =
+      get_screenshot(display, rect.x, rect.y, rect.width, rect.height);
 
   cv::imwrite("screenshot.png", image);
 
