@@ -1,10 +1,9 @@
 #ifndef NEURAL_NETWORK_HPP_
 #define NEURAL_NETWORK_HPP_
 
-#include <torch/torch.h>
+#include "action.hpp"
 
-// [上, 右, 下, 左, クリック]
-enum Action { kUp, kRight, kDown, kLeft, kClick, kActionSize };
+#include <torch/torch.h>
 
 // 画像を入力として行動を出力するニューラルネットワーク
 class NeuralNetworkImpl : public torch::nn::Module

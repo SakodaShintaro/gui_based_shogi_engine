@@ -1,6 +1,5 @@
-#include "cv_mat_to_tensor.hpp"
+#include "action.hpp"
 #include "gui_control.hpp"
-#include "neural_network.hpp"
 
 #include <opencv2/opencv.hpp>
 
@@ -8,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <thread>
 
 // ウィンドウ左上を原点としたときの盤面の範囲
@@ -30,23 +30,18 @@ int main()
     return 1;
   }
 
-  const torch::Device device(torch::kCUDA);
-  const int64_t window_h = 600;
-  const int64_t window_w = 800;
-  NeuralNetwork nn(window_h, window_w);
-  nn->to(device);
-
-  torch::optim::Adam optimizer(nn->parameters(), torch::optim::AdamOptions(1e-4));
-
-  int64_t counter = 0;
+  std::mt19937_64 engine(std::random_device{}());
+  std::uniform_int_distribution<int64_t> dist(0, kActionSize - 1);
 
   const std::string save_root_dir = "./data/";
   const std::string save_image_dir = save_root_dir + "/image/";
   std::filesystem::create_directories(save_image_dir);
   std::ofstream ofs(save_root_dir + "/info.tsv");
-  ofs << "counter\taction\treward" << std::endl;
+  ofs << "itr\taction\treward" << std::endl;
 
-  while (true) {
+  cv::Mat prev_image;
+
+  for (int64 itr = 0; itr < 10000; itr++) {
     auto now = std::chrono::system_clock::now();
     std::time_t end_time = std::chrono::system_clock::to_time_t(now);
 
@@ -58,41 +53,35 @@ int main()
               << "\trect: (" << rect.x << ", " << rect.y << ", " << rect.width << ", "
               << rect.height << ")" << std::endl;
 
-    // Windowのタイトルでいろいろ判断する
-    // TODO:
-    // 成れる指し手を行ったときに「成りますか？」という小さいウィンドウが出ることに注意
-    // const std::string key = "将棋所";
+    // Windowのタイトルで判断する
     const std::string key = "Siv3D App";
     const std::size_t pos = title.find(key);
     if (pos == std::string::npos) {
       std::this_thread::sleep_for(std::chrono::seconds(1));
+      itr--;
       continue;
     }
 
-    const cv::Mat image_before = get_screenshot(display, rect);
+    const cv::Mat curr_image = get_screenshot(display, rect);
+    if (itr == 0) {
+      prev_image = curr_image.clone();
+    }
 
     // Cursor位置追加
-    cv::Mat image_with_cursor = image_before.clone();
+    cv::Mat image_with_cursor = curr_image.clone();
     const cv::Point curr_cursor = get_current_cursor_abs_position(display);
     const cv::Point cursor_in_image(curr_cursor.x - rect.x, curr_cursor.y - rect.y);
     cv::circle(image_with_cursor, cursor_in_image, 5, cv::Scalar(0, 0, 255), -1);
+    cv::circle(image_with_cursor, cursor_in_image, 2, cv::Scalar(0, 255, 0), -1);
 
     const std::string save_name =
       (std::stringstream() << save_image_dir << "/input_image_" << std::setfill('0') << std::setw(8)
-                           << counter << ".png")
+                           << itr << ".png")
         .str();
     cv::imwrite(save_name, image_with_cursor);
 
-    torch::Tensor image_tensor = cv_mat_to_tensor(image_before);
-    image_tensor = image_tensor.unsqueeze(0);
-    image_tensor = image_tensor.to(device);
-    torch::Tensor out = nn->forward(image_tensor);
-    out = out.squeeze(0);  // [1, 5] -> [5]
-    torch::Tensor softmax_score = torch::softmax(out, 0);
-
-    // argmax取得
-    torch::Tensor index_tensor = torch::multinomial(softmax_score, 1);
-    const int64_t action_index = index_tensor[0].item<int64_t>();
+    // 行動取得
+    const int64_t action_index = dist(engine);
 
     if (action_index == kClick) {
       mouse_click(display, 1);
@@ -116,29 +105,16 @@ int main()
       warp_cursor(display, curr_cursor.x, curr_cursor.y);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(250));
-
-    const cv::Mat image_after = get_screenshot(display, rect);
-
     // 画像の差分量を計算
     cv::Mat diff;
-    cv::absdiff(image_before, image_after, diff);
+    cv::absdiff(curr_image, prev_image, diff);
     diff.convertTo(diff, CV_32F);
     const double diff_norm = cv::norm(cv::mean(diff));
+    const double reward = (diff_norm > 0);
 
-    // 更新されるように強化学習
-    torch::Tensor reward = torch::tensor(diff_norm > 0).to(device);
-    torch::Tensor log_policy = torch::log_softmax(out, 0)[action_index];
-    torch::Tensor loss = -log_policy * reward;
-    std::cerr << "reward: " << reward.item<float>() << "\tlog_policy: " << log_policy.item<float>()
-              << "\tloss: " << loss.item<float>() << std::endl;
-    optimizer.zero_grad();
-    loss.backward();
-    optimizer.step();
+    prev_image = curr_image.clone();
 
-    ofs << counter << "\t" << action_index << "\t" << reward.item<float>() << std::endl;
-
-    counter++;
+    ofs << itr << "\t" << action_index << "\t" << reward << std::endl;
   }
 
   XCloseDisplay(display);
