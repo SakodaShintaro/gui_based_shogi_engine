@@ -25,13 +25,10 @@ constexpr int kBoardRD_y = 600;
 int main()
 {
   Actor actor = Actor(kWindowHeight, kWindowWidth);
-  Critic critic = Critic(kWindowHeight, kWindowWidth);
   const torch::Device device(torch::kCUDA);
   actor->to(device);
-  critic->to(device);
 
-  torch::optim::Adam optimizer_actor(actor->parameters(), torch::optim::AdamOptions(1e-4));
-  torch::optim::Adam optimizer_critic(critic->parameters(), torch::optim::AdamOptions(1e-4));
+  torch::optim::Adam optimizer(actor->parameters(), torch::optim::AdamOptions(1e-4));
 
   const std::string data_root_dir = "./data/";
   const std::string data_image_dir = data_root_dir + "/image/";
@@ -68,13 +65,13 @@ int main()
   }
 
   const int64_t data_num = images.size();
-  const int64_t batch_size = 32;
-  const int64_t sequence_length = 32;
+  const int64_t batch_size = 64;
+  const int64_t sequence_length = 64;
 
   std::mt19937_64 engine(std::random_device{}());
   std::uniform_int_distribution<int64_t> dist(0, data_num - sequence_length);
 
-  for (int64_t itr = 0; itr < 100; itr++) {
+  for (int64_t itr = 0; itr < 1000; itr++) {
     std::vector<int64_t> indices(batch_size);
     std::vector<torch::Tensor> batch_images(batch_size);
     std::vector<torch::Tensor> batch_actions(batch_size);
@@ -102,12 +99,14 @@ int main()
     const torch::Tensor action_log_prob = log_policy.gather(1, actions.unsqueeze(1));
     const torch::Tensor loss = -action_log_prob * rewards;
     const torch::Tensor loss_mean = loss.mean();
-    optimizer_actor.zero_grad();
+    optimizer.zero_grad();
     loss_mean.backward();
-    optimizer_actor.step();
+    optimizer.step();
     std::stringstream ss;
     ss << itr << "\t" << loss_mean.item<float>() << std::endl;
     std::cout << ss.str();
     ofs << ss.str();
   }
+
+  torch::save(actor, save_dir + "/actor.pt");
 }
