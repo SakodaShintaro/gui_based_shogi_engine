@@ -1,5 +1,7 @@
 #include "action.hpp"
+#include "cv_mat_to_tensor.hpp"
 #include "gui_control.hpp"
+#include "neural_network.hpp"
 
 #include <opencv2/opencv.hpp>
 
@@ -9,6 +11,10 @@
 #include <iostream>
 #include <random>
 #include <thread>
+
+// ウィンドウサイズ
+constexpr int kWindowWidth = 800;
+constexpr int kWindowHeight = 600;
 
 // ウィンドウ左上を原点としたときの盤面の範囲
 // (10, 60) ~ (570, 500)
@@ -38,6 +44,12 @@ int main()
   std::filesystem::create_directories(save_image_dir);
   std::ofstream ofs(save_root_dir + "/info.tsv");
   ofs << "itr\taction\treward" << std::endl;
+
+  Actor actor(kWindowHeight, kWindowWidth);
+  const std::string model_path = save_root_dir + "/offline_training/actor.pt";
+  if (std::filesystem::exists(model_path)) {
+    torch::load(actor, model_path);
+  }
 
   cv::Mat prev_image;
 
@@ -81,7 +93,12 @@ int main()
     cv::imwrite(save_name, image_with_cursor);
 
     // 行動取得
-    const int64_t action_index = dist(engine);
+    torch::Tensor input_tensor = cv_mat_to_tensor(curr_image);
+    input_tensor = input_tensor.unsqueeze(0);
+    input_tensor = input_tensor.to(torch::kCUDA);
+    torch::Tensor action_tensor = actor->forward(input_tensor);
+    torch::Tensor softmax_tensor = torch::softmax(action_tensor, 1);
+    const int64_t action_index = torch::multinomial(softmax_tensor, 1).item<int64_t>();
 
     if (action_index == kClick) {
       mouse_click(display, 1);
