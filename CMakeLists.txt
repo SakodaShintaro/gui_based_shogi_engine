@@ -10,12 +10,12 @@ find_package(OpenCV REQUIRED)
 list(APPEND CMAKE_PREFIX_PATH ../libtorch-2.1.1)
 find_package(Torch REQUIRED)
 
-# main_for_random_agent
-add_executable(main_for_random_agent
-  cpp/main_for_random_agent.cpp
+# main_for_play
+add_executable(main_for_play
+  cpp/main_for_play.cpp
   cpp/neural_network.cpp)
-target_include_directories(main_for_random_agent PUBLIC ${OpenCV_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS} ${TORCH_INCLUDE})
-target_link_libraries(main_for_random_agent ${X11_LIBRARIES} ${OpenCV_LIBS} ${TORCH_LIBRARIES})
+target_include_directories(main_for_play PUBLIC ${OpenCV_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS} ${TORCH_INCLUDE})
+target_link_libraries(main_for_play ${X11_LIBRARIES} ${OpenCV_LIBS} ${TORCH_LIBRARIES})
 
 # main_for_offline_training
 add_executable(main_for_offline_training

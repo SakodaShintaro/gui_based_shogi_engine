@@ -37,7 +37,7 @@ int main()
     return 1;
   }
 
-  const std::string save_root_dir = "./data/";
+  const std::string save_root_dir = "./data/play/";
   const std::string save_image_dir = save_root_dir + "/image/";
   std::filesystem::create_directories(save_image_dir);
   std::ofstream ofs(save_root_dir + "/info.tsv");

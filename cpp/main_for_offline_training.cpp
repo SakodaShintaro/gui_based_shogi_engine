@@ -31,7 +31,7 @@ int main()
   torch::optim::Adam optimizer(actor->parameters(), torch::optim::AdamOptions(1e-4));
 
   const std::string data_root_dir = "./data/";
-  const std::string data_image_dir = data_root_dir + "/image/";
+  const std::string data_image_dir = data_root_dir + "/play/image/";
   const std::string save_dir = data_root_dir + "/offline_training/";
   std::filesystem::create_directories(save_dir);
   std::ofstream ofs(save_dir + "/log.tsv");
@@ -41,7 +41,7 @@ int main()
   std::vector<int64_t> actions;
   std::vector<float> rewards;
   {
-    std::ifstream ifs(data_root_dir + "/info.tsv");
+    std::ifstream ifs(data_root_dir + "/play/info.tsv");
     std::string line;
     std::getline(ifs, line);  // ヘッダーを読み飛ばす
     while (std::getline(ifs, line)) {
