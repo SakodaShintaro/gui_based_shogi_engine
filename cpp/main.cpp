@@ -10,10 +10,14 @@
 
 // ウィンドウ左上を原点としたときの盤面の範囲
 // (10, 60) ~ (570, 500)
-constexpr int kBoardLU_x = 10;
-constexpr int kBoardLU_y = 60;
-constexpr int kBoardRD_x = 570;
-constexpr int kBoardRD_y = 500;
+// constexpr int kBoardLU_x = 10;
+// constexpr int kBoardLU_y = 60;
+// constexpr int kBoardRD_x = 570;
+// constexpr int kBoardRD_y = 500;
+constexpr int kBoardLU_x = 0;
+constexpr int kBoardLU_y = 0;
+constexpr int kBoardRD_x = 800;
+constexpr int kBoardRD_y = 600;
 
 int main()
 {
@@ -25,7 +29,9 @@ int main()
   }
 
   const torch::Device device(torch::kCUDA);
-  NeuralNetwork nn;
+  const int64_t window_h = 600;
+  const int64_t window_w = 800;
+  NeuralNetwork nn(window_h, window_w);
   nn->to(device);
 
   torch::optim::Adam optimizer(nn->parameters(), torch::optim::AdamOptions(1e-4));
@@ -45,7 +51,8 @@ int main()
     // Windowのタイトルでいろいろ判断する
     // TODO:
     // 成れる指し手を行ったときに「成りますか？」という小さいウィンドウが出ることに注意
-    const std::string key = "将棋所";
+    // const std::string key = "将棋所";
+    const std::string key = "Siv3D App";
     const std::size_t pos = title.find(key);
     if (pos == std::string::npos) {
       std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -73,7 +80,7 @@ int main()
     torch::Tensor index_tensor = torch::multinomial(softmax_score, 1);
     const int64_t index = index_tensor[0].item<int64_t>();
 
-    constexpr int kUnit = 10;
+    constexpr int kUnit = 20;
     if (index == kClick) {
       mouse_click(display, 1);
       std::cerr << "Click!" << std::endl;
@@ -96,7 +103,7 @@ int main()
       warp_cursor(display, curr_cursor.x, curr_cursor.y);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
 
     const cv::Mat image_after = get_screenshot(display, rect);
     cv::imwrite("screenshot2.png", image_after);
@@ -104,17 +111,18 @@ int main()
     // 画像の差分量を計算
     cv::Mat diff;
     cv::absdiff(image_before, image_after, diff);
-    const double diff_norm = cv::norm(cv::sum(diff));
+    diff.convertTo(diff, CV_32F);
+    const double diff_norm = cv::norm(cv::mean(diff));
 
-    // 差分を大きくするように強化学習（TODO:流石にこれではまともに動かない）
-    torch::Tensor reward = torch::tensor(diff_norm).to(device);
-    torch::Tensor loss = -torch::log_softmax(out, 0)[index] * reward;
-    std::cerr << "loss: " << loss.item<float>() << std::endl;
+    // 更新されるように強化学習
+    torch::Tensor reward = torch::tensor(diff_norm > 0).to(device);
+    torch::Tensor log_policy = torch::log_softmax(out, 0)[index];
+    torch::Tensor loss = -log_policy * reward;
+    std::cerr << "reward: " << reward.item<float>() << "\tlog_policy: " << log_policy.item<float>()
+              << "\tloss: " << loss.item<float>() << std::endl;
     optimizer.zero_grad();
     loss.backward();
     optimizer.step();
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
 
   XCloseDisplay(display);

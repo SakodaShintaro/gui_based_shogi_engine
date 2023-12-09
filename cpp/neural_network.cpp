@@ -18,41 +18,50 @@ H' = (H - K) / S + 1
 W' = (W - K) / S + 1
 */
 
-NeuralNetworkImpl::NeuralNetworkImpl()
+NeuralNetworkImpl::NeuralNetworkImpl(int64_t h, int64_t w)
 {
   using namespace torch::nn;
 
-  // H,Wを変えないConv2D
-  auto MyConv2d = [](int64_t in_channels, int64_t out_channels) {
-    return Conv2d(Conv2dOptions(in_channels, out_channels, 3).padding(1));
-  };
+  const std::vector<std::pair<int64_t, int64_t>> in_out_channels = {
+    {3, 32}, {32, 64}, {64, 64}, {64, 64}, {64, 64}};
 
-  conv1_ = register_module("conv1", MyConv2d(3, 32));
-  conv2_ = register_module("conv2", MyConv2d(32, 64));
-  conv3_ = register_module("conv3", MyConv2d(64, 64));
-  conv4_ = register_module("conv4", MyConv2d(64, 64));
-  conv5_ = register_module("conv5", MyConv2d(64, 64));
-  fc1_ = register_module("fc1", Linear(64 * 21 * 31, 512));
+  if (in_out_channels.size() != conv_layer_num) {
+    std::cerr << "in_out_channels.size() != conv_layer_num" << std::endl;
+    std::exit(1);
+  }
+
+  for (int64_t i = 0; i < conv_layer_num; i++) {
+    const auto [in_channels, out_channels] = in_out_channels[i];
+
+    // H,Wを変えないConv2D
+    conv_layers_[i] = register_module(
+      "conv" + std::to_string(i), Conv2d(Conv2dOptions(in_channels, out_channels, 3).padding(1)));
+
+    // max_pool2dによってサイズが変わる
+    h = (h - 2) / 2 + 1;
+    w = (w - 2) / 2 + 1;
+  }
+
+  const int64_t last_out_ch = in_out_channels.back().second;
+
+  fc1_ = register_module("fc1", Linear(last_out_ch * h * w, 512));
   fc2_ = register_module("fc2", Linear(512, 512));
   fc3_ = register_module("fc3", Linear(512, kActionSize));
 }
 
 torch::Tensor NeuralNetworkImpl::forward(torch::Tensor input)
 {
-  torch::Tensor x = input;              // [bs, 3, 691, 1016]
-  x = torch::relu(conv1_->forward(x));  // [bs, 32, 691, 1016]
-  x = torch::max_pool2d(x, 2, 2);       // [bs, 32, 345, 508]
-  x = torch::relu(conv2_->forward(x));  // [bs, 64, 345, 508]
-  x = torch::max_pool2d(x, 2, 2);       // [bs, 64, 172, 254]
-  x = torch::relu(conv3_->forward(x));  // [bs, 64, 172, 254]
-  x = torch::max_pool2d(x, 2, 2);       // [bs, 64, 86, 127]
-  x = torch::relu(conv4_->forward(x));  // [bs, 64, 86, 127]
-  x = torch::max_pool2d(x, 2, 2);       // [bs, 64, 43, 63]
-  x = torch::relu(conv5_->forward(x));  // [bs, 64, 43, 63]
-  x = torch::max_pool2d(x, 2, 2);       // [bs, 64, 21, 31]
-  x = x.flatten(1);                     // [bs, 64 * 21 * 31]
-  x = torch::relu(fc1_->forward(x));    // [bs, 512]
-  x = torch::relu(fc2_->forward(x));    // [bs, 512]
-  x = fc3_->forward(x);                 // [bs, kActionSize]
+  torch::Tensor x = input;  // [bs, 3, h, w]
+
+  for (int64_t i = 0; i < conv_layer_num; i++) {
+    x = conv_layers_[i]->forward(x);
+    x = torch::relu(x);
+    x = torch::max_pool2d(x, 2, 2);
+  }
+
+  x = x.flatten(1);                   // [bs, last_out_ch * h * w]
+  x = torch::relu(fc1_->forward(x));  // [bs, 512]
+  x = torch::relu(fc2_->forward(x));  // [bs, 512]
+  x = fc3_->forward(x);               // [bs, kActionSize]
   return x;
 }
