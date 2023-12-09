@@ -26,6 +26,7 @@ constexpr int kBoardLU_x = 0;
 constexpr int kBoardLU_y = 0;
 constexpr int kBoardRD_x = 800;
 constexpr int kBoardRD_y = 600;
+const cv::Point center_point((kBoardLU_x + kBoardRD_x) / 2, (kBoardLU_y + kBoardRD_y) / 2);
 
 int main()
 {
@@ -73,6 +74,10 @@ int main()
       continue;
     }
 
+    if (itr == 0) {
+      warp_cursor(display, center_point.x + rect.x, center_point.y + rect.y);
+    }
+
     const cv::Mat curr_image = get_screenshot(display, rect);
     if (itr == 0) {
       prev_image = curr_image.clone();
@@ -80,7 +85,7 @@ int main()
 
     // Cursor位置追加
     cv::Mat image_with_cursor = curr_image.clone();
-    const cv::Point curr_cursor = get_current_cursor_abs_position(display);
+    cv::Point curr_cursor = get_current_cursor_abs_position(display);
     const cv::Point cursor_in_image(curr_cursor.x - rect.x, curr_cursor.y - rect.y);
     cv::circle(image_with_cursor, cursor_in_image, 5, cv::Scalar(0, 0, 255), -1);
     cv::circle(image_with_cursor, cursor_in_image, 2, cv::Scalar(0, 255, 0), -1);
@@ -103,7 +108,6 @@ int main()
       mouse_click(display, 1);
       std::cerr << "Click!" << std::endl;
     } else {
-      cv::Point curr_cursor = get_current_cursor_abs_position(display);
       if (action_index == kUp) {
         curr_cursor.y -= kMoveUnit;
       } else if (action_index == kRight) {
