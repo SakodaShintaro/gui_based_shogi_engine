@@ -11,7 +11,7 @@ void Main()
     const s3d::Size size = Window::GetState().frameBufferSize;
     const int64_t x = s3d::Random(size.x - 1);
     const int64_t y = s3d::Random(size.y - 1);
-    circle = s3d::Circle{x, y, 100.0};
+    circle = s3d::Circle{x, y, 200.0};
     // circle_color = RandomColorF();
     circle_color = s3d::Palette::Blue;
   };
