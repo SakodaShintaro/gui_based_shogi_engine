@@ -5,6 +5,8 @@
 #include <opencv2/opencv.hpp>
 
 #include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <thread>
 
@@ -35,6 +37,14 @@ int main()
   nn->to(device);
 
   torch::optim::Adam optimizer(nn->parameters(), torch::optim::AdamOptions(1e-4));
+
+  int64_t counter = 0;
+
+  const std::string save_root_dir = "./data/";
+  const std::string save_image_dir = save_root_dir + "/image/";
+  std::filesystem::create_directories(save_image_dir);
+  std::ofstream ofs(save_root_dir + "/info.tsv");
+  ofs << "counter\taction\treward" << std::endl;
 
   while (true) {
     auto now = std::chrono::system_clock::now();
@@ -67,7 +77,11 @@ int main()
     const cv::Point cursor_in_image(curr_cursor.x - rect.x, curr_cursor.y - rect.y);
     cv::circle(image_with_cursor, cursor_in_image, 5, cv::Scalar(0, 0, 255), -1);
 
-    cv::imwrite("screenshot.png", image_with_cursor);
+    const std::string save_name =
+      (std::stringstream() << save_image_dir << "/input_image_" << std::setfill('0') << std::setw(8)
+                           << counter << ".png")
+        .str();
+    cv::imwrite(save_name, image_with_cursor);
 
     torch::Tensor image_tensor = cv_mat_to_tensor(image_before);
     image_tensor = image_tensor.unsqueeze(0);
@@ -78,21 +92,21 @@ int main()
 
     // argmax取得
     torch::Tensor index_tensor = torch::multinomial(softmax_score, 1);
-    const int64_t index = index_tensor[0].item<int64_t>();
+    const int64_t action_index = index_tensor[0].item<int64_t>();
 
     constexpr int kUnit = 20;
-    if (index == kClick) {
+    if (action_index == kClick) {
       mouse_click(display, 1);
       std::cerr << "Click!" << std::endl;
     } else {
       cv::Point curr_cursor = get_current_cursor_abs_position(display);
-      if (index == kUp) {
+      if (action_index == kUp) {
         curr_cursor.y -= kUnit;
-      } else if (index == kRight) {
+      } else if (action_index == kRight) {
         curr_cursor.x += kUnit;
-      } else if (index == kDown) {
+      } else if (action_index == kDown) {
         curr_cursor.y += kUnit;
-      } else if (index == kLeft) {
+      } else if (action_index == kLeft) {
         curr_cursor.x -= kUnit;
       }
 
@@ -106,7 +120,6 @@ int main()
     std::this_thread::sleep_for(std::chrono::milliseconds(250));
 
     const cv::Mat image_after = get_screenshot(display, rect);
-    cv::imwrite("screenshot2.png", image_after);
 
     // 画像の差分量を計算
     cv::Mat diff;
@@ -116,13 +129,17 @@ int main()
 
     // 更新されるように強化学習
     torch::Tensor reward = torch::tensor(diff_norm > 0).to(device);
-    torch::Tensor log_policy = torch::log_softmax(out, 0)[index];
+    torch::Tensor log_policy = torch::log_softmax(out, 0)[action_index];
     torch::Tensor loss = -log_policy * reward;
     std::cerr << "reward: " << reward.item<float>() << "\tlog_policy: " << log_policy.item<float>()
               << "\tloss: " << loss.item<float>() << std::endl;
     optimizer.zero_grad();
     loss.backward();
     optimizer.step();
+
+    ofs << counter << "\t" << action_index << "\t" << reward.item<float>() << std::endl;
+
+    counter++;
   }
 
   XCloseDisplay(display);
