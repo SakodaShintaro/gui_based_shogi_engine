@@ -1,8 +1,9 @@
+#ifndef CV_MAT_TO_TENSOR_HPP
+#define CV_MAT_TO_TENSOR_HPP
+
 #include <opencv2/core/core.hpp>
 
 #include <torch/torch.h>
-
-#include <vector>
 
 torch::Tensor cv_mat_to_tensor(const cv::Mat & cv_img)
 {
@@ -15,3 +16,5 @@ torch::Tensor cv_mat_to_tensor(const cv::Mat & cv_img)
   tensor_img = tensor_img.permute({2, 0, 1});
   return tensor_img;
 }
+
+#endif  // CV_MAT_TO_TENSOR_HPP
