@@ -1,5 +1,7 @@
 #include "neural_network.hpp"
 
+#include "action.hpp"
+
 /*
 CNNの出力サイズ計算(https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html)
 Input: (N, C_in, H_in, W_in)
@@ -18,7 +20,9 @@ H' = (H - K) / S + 1
 W' = (W - K) / S + 1
 */
 
-NeuralNetworkImpl::NeuralNetworkImpl(int64_t h, int64_t w)
+constexpr int64_t hidden_dim = 512;
+
+ImageEncoderImpl::ImageEncoderImpl(int64_t h, int64_t w)
 {
   using namespace torch::nn;
 
@@ -43,15 +47,12 @@ NeuralNetworkImpl::NeuralNetworkImpl(int64_t h, int64_t w)
   }
 
   const int64_t last_out_ch = in_out_channels.back().second;
-
-  fc1_ = register_module("fc1", Linear(last_out_ch * h * w, 512));
-  fc2_ = register_module("fc2", Linear(512, 512));
-  fc3_ = register_module("fc3", Linear(512, kActionSize));
+  linear_ = register_module("linear", Linear(last_out_ch * h * w, hidden_dim));
 }
 
-torch::Tensor NeuralNetworkImpl::forward(torch::Tensor input)
+torch::Tensor ImageEncoderImpl::forward(torch::Tensor image)
 {
-  torch::Tensor x = input;  // [bs, 3, h, w]
+  torch::Tensor x = image;  // [bs, 3, h, w]
 
   for (int64_t i = 0; i < conv_layer_num; i++) {
     x = conv_layers_[i]->forward(x);
@@ -59,9 +60,38 @@ torch::Tensor NeuralNetworkImpl::forward(torch::Tensor input)
     x = torch::max_pool2d(x, 2, 2);
   }
 
-  x = x.flatten(1);                   // [bs, last_out_ch * h * w]
-  x = torch::relu(fc1_->forward(x));  // [bs, 512]
-  x = torch::relu(fc2_->forward(x));  // [bs, 512]
-  x = fc3_->forward(x);               // [bs, kActionSize]
+  x = x.flatten(1);  // [bs, last_out_ch * h * w]
+  x = linear_->forward(x);
+  return x;
+}
+
+ActorImpl::ActorImpl(int64_t h, int64_t w)
+{
+  using namespace torch::nn;
+  image_encoder_ = register_module("image_encoder", ImageEncoder(h, w));
+  linear_ = register_module("linear", Linear(hidden_dim, kActionSize));
+}
+
+torch::Tensor ActorImpl::forward(torch::Tensor input)
+{
+  torch::Tensor x = input;  // [bs, 3, h, w]
+  x = image_encoder_->forward(x);
+  x = linear_->forward(x);
+  return x;
+}
+
+CriticImpl::CriticImpl(int64_t h, int64_t w)
+{
+  using namespace torch::nn;
+  image_encoder_ = register_module("image_encoder", ImageEncoder(h, w));
+  linear_ = register_module("linear", Linear(hidden_dim + kActionSize, 1));
+}
+
+torch::Tensor CriticImpl::forward(torch::Tensor image, torch::Tensor action)
+{
+  torch::Tensor one_hot_action = torch::nn::functional::one_hot(action, kActionSize);
+  torch::Tensor image_x = image_encoder_->forward(image);      // [bs, hidden_dim]
+  torch::Tensor x = torch::cat({image_x, one_hot_action}, 1);  // [bs, hidden_dim + kActionSize]
+  x = linear_->forward(x);
   return x;
 }
