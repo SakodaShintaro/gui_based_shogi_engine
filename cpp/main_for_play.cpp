@@ -44,9 +44,12 @@ int main()
   ofs << "itr\taction\treward" << std::endl;
 
   Actor actor(kWindowHeight, kWindowWidth);
-  const std::string model_path = save_root_dir + "/offline_training/actor.pt";
+  const std::string model_path = save_root_dir + "/../offline_training/actor.pt";
   if (std::filesystem::exists(model_path)) {
     torch::load(actor, model_path);
+    std::cout << "load!" << std::endl;
+    std::string wait;
+    std::cin >> wait;
   }
   const torch::Device device(torch::kCUDA);
   actor->to(device);
