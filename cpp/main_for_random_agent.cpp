@@ -36,9 +36,6 @@ int main()
     return 1;
   }
 
-  std::mt19937_64 engine(std::random_device{}());
-  std::uniform_int_distribution<int64_t> dist(0, kActionSize - 1);
-
   const std::string save_root_dir = "./data/";
   const std::string save_image_dir = save_root_dir + "/image/";
   std::filesystem::create_directories(save_image_dir);
@@ -50,6 +47,8 @@ int main()
   if (std::filesystem::exists(model_path)) {
     torch::load(actor, model_path);
   }
+  const torch::Device device(torch::kCUDA);
+  actor->to(device);
 
   cv::Mat prev_image;
 
@@ -95,7 +94,7 @@ int main()
     // 行動取得
     torch::Tensor input_tensor = cv_mat_to_tensor(curr_image);
     input_tensor = input_tensor.unsqueeze(0);
-    input_tensor = input_tensor.to(torch::kCUDA);
+    input_tensor = input_tensor.to(device);
     torch::Tensor action_tensor = actor->forward(input_tensor);
     torch::Tensor softmax_tensor = torch::softmax(action_tensor, 1);
     const int64_t action_index = torch::multinomial(softmax_tensor, 1).item<int64_t>();
