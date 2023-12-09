@@ -8,4 +8,4 @@ enum Action { kUp, kRight, kDown, kLeft, kClick, kActionSize };
 
 constexpr int64_t kMoveUnit = 40;
 
-#endif
+#endif  // ACTION_HPP_
