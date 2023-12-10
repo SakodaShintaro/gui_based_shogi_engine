@@ -65,29 +65,70 @@ int main()
   }
 
   const int64_t data_num = images.size();
+
+  // 指数割引の累積報酬
+  constexpr float gamma = 0.9f;
+  std::vector<float> sum_rewards(data_num, 0.0f);
+  sum_rewards.back() = rewards.back();
+  for (int64_t i = data_num - 2; i >= 0; i--) {
+    sum_rewards[i] = gamma * sum_rewards[i + 1] + rewards[i];
+  }
+
   const int64_t batch_size = 64;
-  const int64_t sequence_length = 64;
+
+  // 実行してみて結果を保存する
+  auto save_result = [&](const std::string & path) {
+    std::ofstream ofs(path);
+    ofs << std::fixed;
+    torch::NoGradGuard no_grad_guard;
+    actor->eval();
+    for (int64_t i = 0; i < data_num; i += batch_size) {
+      std::vector<torch::Tensor> batch_images(batch_size);
+      std::vector<torch::Tensor> batch_actions(batch_size);
+      std::vector<torch::Tensor> batch_rewards(batch_size);
+      int64_t actual_num = 0;
+      for (int64_t j = 0; j < batch_size && i + j < data_num; j++) {
+        const int64_t index = i + j;
+        batch_images[j] = cv_mat_to_tensor(images[index]);
+        batch_actions[j] = torch::tensor(actions[index], torch::kLong);
+        batch_rewards[j] = torch::tensor(sum_rewards[index]);
+        actual_num++;
+      }
+      batch_images.resize(actual_num);
+      batch_actions.resize(actual_num);
+      batch_rewards.resize(actual_num);
+
+      const torch::Tensor images = torch::stack(batch_images).to(device);
+      const torch::Tensor actions = torch::stack(batch_actions).to(device);
+      const torch::Tensor rewards = torch::stack(batch_rewards).to(device);
+      const torch::Tensor policy_logits = actor->forward(images);
+      const torch::Tensor policy = torch::softmax(policy_logits, 1);
+      for (int64_t j = 0; j < batch_size && i + j < data_num; j++) {
+        ofs << std::setfill('0') << std::setw(8) << i + j << "\t";
+        ofs << batch_actions[j].item<int64_t>() << "\t";
+        ofs << batch_rewards[j].item<float>() << "\t";
+        for (int64_t k = 0; k < kActionSize; k++) {
+          ofs << policy[j][k].item<float>() << "\t\n"[k == kActionSize - 1];
+        }
+      }
+    }
+    actor->train();
+  };
+
+  save_result(save_dir + "/policy_result_before.tsv");
 
   std::mt19937_64 engine(std::random_device{}());
-  std::uniform_int_distribution<int64_t> dist(0, data_num - sequence_length);
+  std::uniform_int_distribution<int64_t> dist(0, data_num - 1);
 
-  for (int64_t itr = 0; itr < 1000; itr++) {
-    std::vector<int64_t> indices(batch_size);
+  for (int64_t itr = 0; itr < 100; itr++) {
     std::vector<torch::Tensor> batch_images(batch_size);
     std::vector<torch::Tensor> batch_actions(batch_size);
     std::vector<torch::Tensor> batch_rewards(batch_size);
     for (int64_t i = 0; i < batch_size; i++) {
-      indices[i] = dist(engine);
-      const int64_t index = indices[i];
-
-      float reward_sum = 0;
-      constexpr float gamma = 0.9;
-      for (int64_t j = 0; j < sequence_length; j++) {
-        reward_sum += std::pow(gamma, j) * rewards[index + j];
-      }
+      const int64_t index = dist(engine);
       batch_images[i] = cv_mat_to_tensor(images[index]);
       batch_actions[i] = torch::tensor(actions[index], torch::kLong);
-      batch_rewards[i] = torch::tensor(reward_sum);
+      batch_rewards[i] = torch::tensor(sum_rewards[index]);
     }
 
     const torch::Tensor images = torch::stack(batch_images).to(device);
@@ -95,10 +136,11 @@ int main()
     const torch::Tensor rewards = torch::stack(batch_rewards).to(device);
 
     const torch::Tensor policy_logits = actor->forward(images);
-    const torch::Tensor log_policy = torch::log_softmax(policy_logits, 0);
+    const torch::Tensor log_policy = torch::log_softmax(policy_logits, 1);
     const torch::Tensor action_log_prob = log_policy.gather(1, actions.unsqueeze(1));
-    const torch::Tensor loss = -action_log_prob * rewards;
+    const torch::Tensor loss = -action_log_prob.squeeze(1) * rewards;
     const torch::Tensor loss_mean = loss.mean();
+
     optimizer.zero_grad();
     loss_mean.backward();
     optimizer.step();
@@ -107,6 +149,8 @@ int main()
     std::cout << ss.str();
     ofs << ss.str();
   }
+
+  save_result(save_dir + "/policy_result_after.tsv");
 
   torch::save(actor, save_dir + "/actor.pt");
 }
