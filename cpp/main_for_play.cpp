@@ -60,6 +60,7 @@ int main()
     }
 
     if (itr == 0) {
+      const cv::Point center_point((kBoardLU_x + kBoardRD_x) / 2, (kBoardLU_y + kBoardRD_y) / 2);
       warp_cursor(display, center_point.x + rect.x, center_point.y + rect.y);
     }
 

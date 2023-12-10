@@ -1,8 +1,6 @@
 #ifndef WINDOW_SIZE_HPP_
 #define WINDOW_SIZE_HPP_
 
-#include <opencv2/opencv.hpp>
-
 // ウィンドウサイズ
 constexpr int kWindowWidth = 800;
 constexpr int kWindowHeight = 600;
@@ -19,6 +17,5 @@ constexpr int kBoardLU_x = 0;
 constexpr int kBoardLU_y = 0;
 constexpr int kBoardRD_x = 800;
 constexpr int kBoardRD_y = 600;
-const cv::Point center_point((kBoardLU_x + kBoardRD_x) / 2, (kBoardLU_y + kBoardRD_y) / 2);
 
 #endif
