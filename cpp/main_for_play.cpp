@@ -54,9 +54,9 @@ int main()
   const torch::Device device(torch::kCUDA);
   actor->to(device);
 
-  cv::Mat prev_image;
+  cv::Mat next_image_without_cursor;
 
-  for (int64 itr = 0; itr < 10000; itr++) {
+  for (int64 itr = 0; itr < 1000; itr++) {
     auto now = std::chrono::system_clock::now();
     std::time_t end_time = std::chrono::system_clock::to_time_t(now);
 
@@ -64,9 +64,8 @@ int main()
     const Rect rect = get_window_rect(display, window);
     const std::string title = get_window_title(display, window);
     std::cerr << "\n"
-              << std::ctime(&end_time) << " " << title  // time and title
-              << "\trect: (" << rect.x << ", " << rect.y << ", " << rect.width << ", "
-              << rect.height << ")" << std::endl;
+              << std::ctime(&end_time) << " " << title << " " << itr << "\trect: (" << rect.x
+              << ", " << rect.y << ", " << rect.width << ", " << rect.height << ")" << std::endl;
 
     // Windowのタイトルで判断する
     const std::string key = "Siv3D App";
@@ -81,26 +80,25 @@ int main()
       warp_cursor(display, center_point.x + rect.x, center_point.y + rect.y);
     }
 
-    const cv::Mat curr_image = get_screenshot(display, rect);
-    if (itr == 0) {
-      prev_image = curr_image.clone();
-    }
+    // 画像をnextからcurrへコピーする
+    const cv::Mat curr_image_without_cursor =
+      (itr == 0 ? get_screenshot(display, rect) : next_image_without_cursor.clone());
 
-    // Cursor位置追加
-    cv::Mat image_with_cursor = curr_image.clone();
+    // カーソル位置書き込み
     cv::Point curr_cursor = get_current_cursor_abs_position(display);
     const cv::Point cursor_in_image(curr_cursor.x - rect.x, curr_cursor.y - rect.y);
-    cv::circle(image_with_cursor, cursor_in_image, 5, cv::Scalar(0, 0, 255), -1);
-    cv::circle(image_with_cursor, cursor_in_image, 2, cv::Scalar(0, 255, 0), -1);
+    cv::Mat curr_image_with_cursor = curr_image_without_cursor.clone();
+    cv::circle(curr_image_with_cursor, cursor_in_image, 5, cv::Scalar(0, 0, 255), -1);
+    cv::circle(curr_image_with_cursor, cursor_in_image, 2, cv::Scalar(0, 255, 0), -1);
 
     const std::string save_name =
       (std::stringstream() << save_image_dir << "/input_image_" << std::setfill('0') << std::setw(8)
                            << itr << ".png")
         .str();
-    cv::imwrite(save_name, image_with_cursor);
+    cv::imwrite(save_name, curr_image_with_cursor);
 
     // 行動取得
-    torch::Tensor input_tensor = cv_mat_to_tensor(curr_image);
+    torch::Tensor input_tensor = cv_mat_to_tensor(curr_image_with_cursor);
     input_tensor = input_tensor.unsqueeze(0);
     input_tensor = input_tensor.to(device);
     torch::Tensor action_tensor = actor->forward(input_tensor);
@@ -109,7 +107,6 @@ int main()
 
     if (action_index == kClick) {
       mouse_click(display, 1);
-      std::cerr << "Click!" << std::endl;
     } else {
       if (action_index == kUp) {
         curr_cursor.y -= kMoveUnit;
@@ -128,14 +125,17 @@ int main()
       warp_cursor(display, curr_cursor.x, curr_cursor.y);
     }
 
+    // GUIへ反映されるのを待つ
+    std::this_thread::sleep_for(std::chrono::milliseconds(80));
+
+    next_image_without_cursor = get_screenshot(display, rect);
+
     // 画像の差分量を計算
     cv::Mat diff;
-    cv::absdiff(curr_image, prev_image, diff);
+    cv::absdiff(next_image_without_cursor, curr_image_without_cursor, diff);
     diff.convertTo(diff, CV_32F);
     const double diff_norm = cv::norm(cv::mean(diff));
     const double reward = (diff_norm > 0);
-
-    prev_image = curr_image.clone();
 
     ofs << itr << "\t" << action_index << "\t" << reward << std::endl;
   }
