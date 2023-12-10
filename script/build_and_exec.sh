@@ -3,6 +3,8 @@ set -eux
 
 cd $(dirname $0)/../build-Release
 
+cmake --build ./ --config Release --target all --
+
 rm -rf ./data
 
 # 0から10までループ
