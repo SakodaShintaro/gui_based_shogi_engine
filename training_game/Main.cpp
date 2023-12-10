@@ -12,7 +12,7 @@ void Main()
   auto update = [&]() {
     // Scene::SetBackground(RandomColorF());
     Scene::SetBackground(s3d::Palette::White);
-    const s3d::Size size = Window::GetState().frameBufferSize;
+    const s3d::Size size = Scene::Size();
     const int64_t x = s3d::Random(size.x - 1);
     const int64_t y = s3d::Random(size.y - 1);
     circle = s3d::Circle{x, y, radius};
