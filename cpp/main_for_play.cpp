@@ -48,8 +48,6 @@ int main()
   if (std::filesystem::exists(model_path)) {
     torch::load(actor, model_path);
     std::cout << "load!" << std::endl;
-    std::string wait;
-    std::cin >> wait;
   }
   const torch::Device device(torch::kCUDA);
   actor->to(device);
