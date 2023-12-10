@@ -24,7 +24,6 @@ void warp_cursor(Display * display, int x, int y)
 
 void mouse_click(Display * display, int button)
 {
-  std::cerr << "mouse_click" << std::endl;
   XButtonEvent event;
   event.type = ButtonPress;
   event.button = button;
