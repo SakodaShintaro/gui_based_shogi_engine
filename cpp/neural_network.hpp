@@ -13,7 +13,7 @@ public:
   torch::Tensor forward(torch::Tensor image);
 
 private:
-  static constexpr int64_t conv_layer_num = 5;
+  static constexpr int64_t conv_layer_num = 4;
   std::vector<torch::nn::Conv2d> conv_layers_{conv_layer_num, nullptr};
   torch::nn::Linear linear_ = nullptr;
 };

@@ -65,7 +65,7 @@ int main()
     sum_rewards[i] = gamma * sum_rewards[i + 1] + rewards[i];
   }
 
-  const int64_t batch_size = 64;
+  const int64_t batch_size = 256;
 
   // 実行してみて結果を保存する
   auto save_result = [&](const std::string & path) {
@@ -111,7 +111,7 @@ int main()
   std::mt19937_64 engine(std::random_device{}());
   std::uniform_int_distribution<int64_t> dist(0, data_num - 1);
 
-  for (int64_t itr = 0; itr < 100; itr++) {
+  for (int64_t itr = 0; itr < 1000; itr++) {
     std::vector<torch::Tensor> batch_images(batch_size);
     std::vector<torch::Tensor> batch_actions(batch_size);
     std::vector<torch::Tensor> batch_rewards(batch_size);

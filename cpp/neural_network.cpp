@@ -20,14 +20,14 @@ H' = (H - K) / S + 1
 W' = (W - K) / S + 1
 */
 
-constexpr int64_t hidden_dim = 512;
+constexpr int64_t hidden_dim = 256;
 
 ImageEncoderImpl::ImageEncoderImpl(int64_t h, int64_t w)
 {
   using namespace torch::nn;
 
   const std::vector<std::pair<int64_t, int64_t>> in_out_channels = {
-    {3, 32}, {32, 64}, {64, 64}, {64, 64}, {64, 64}};
+    {3, 32}, {32, 64}, {64, 64}, {64, 64}};
 
   if (in_out_channels.size() != conv_layer_num) {
     std::cerr << "in_out_channels.size() != conv_layer_num" << std::endl;
