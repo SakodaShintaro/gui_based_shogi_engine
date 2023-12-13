@@ -23,3 +23,10 @@ add_executable(main_for_offline_training
   cpp/neural_network.cpp)
 target_include_directories(main_for_offline_training PUBLIC ${OpenCV_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS} ${TORCH_INCLUDE})
 target_link_libraries(main_for_offline_training ${X11_LIBRARIES} ${OpenCV_LIBS} ${CUDA_LIBRARIES} ${TORCH_LIBRARIES})
+
+# main_for_train_decision_transformer
+add_executable(main_for_train_decision_transformer
+  cpp/main_for_train_decision_transformer.cpp
+  cpp/decision_transformer.cpp)
+target_include_directories(main_for_train_decision_transformer PUBLIC ${OpenCV_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS} ${TORCH_INCLUDE})
+target_link_libraries(main_for_train_decision_transformer ${X11_LIBRARIES} ${OpenCV_LIBS} ${CUDA_LIBRARIES} ${TORCH_LIBRARIES})

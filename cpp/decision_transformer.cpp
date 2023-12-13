@@ -18,9 +18,6 @@ DecisionTransformerImpl::DecisionTransformerImpl(int64_t h, int64_t w, int64_t p
   image_pos_enc_ =
     register_parameter("image_pose_enc_", torch::randn({1, 1, num_patches, kInnerDim}));
 
-  const int64_t kReturnBinNum = 10;
-  const int64_t kRewardBinNum = 10;
-
   return_enc_ = register_module("return_enc", Embedding(kReturnBinNum, kInnerDim));
   action_enc_ = register_module("action_enc", Embedding(kActionSize, kInnerDim));
   reward_enc_ = register_module("reward_enc", Embedding(kRewardBinNum, kInnerDim));

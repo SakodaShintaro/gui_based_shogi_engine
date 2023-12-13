@@ -5,13 +5,15 @@
 
 #include <torch/torch.h>
 
+static constexpr int64_t kInputTimestep = 4;
+const int64_t kReturnBinNum = 2;
+const int64_t kRewardBinNum = 10;
+
 class DecisionTransformerImpl : public torch::nn::Module
 {
 public:
   DecisionTransformerImpl() = default;
   DecisionTransformerImpl(int64_t h, int64_t w, int64_t patch_size);
-
-  static constexpr int64_t kInputTimestep = 4;
 
   // 参考) https://arxiv.org/abs/2205.15241
   // 1タイムステップ分 : [画像(6x6), 収益(1), 行動(1), 報酬(1)]
