@@ -36,10 +36,10 @@ DecisionTransformerImpl::DecisionTransformerImpl(int64_t h, int64_t w, int64_t p
       if (j % tokens_per_step < num_patches) {
         // 同じ画像の中は同じタイムステップのトークンを見れる
         const int64_t tj = j / tokens_per_step;
-        src_mask_[i][j] = (tj <= ti);
+        src_mask_[i][j] = (tj <= ti ? 0 : -1e8);
       } else {
         // それ以外は通常のcausal mask
-        src_mask_[i][j] = (j <= i);
+        src_mask_[i][j] = (j <= i ? 0 : -1e8);
       }
     }
   }
@@ -90,11 +90,10 @@ torch::Tensor DecisionTransformerImpl::forward(
   x = encoder_->forward(x, src_mask_);  // (T * (ph * pw + 3), bs, kInnerDim)
   x = x.permute({1, 0, 2});             // (bs, T * (ph * pw + 3), kInnerDim)
 
-  // patch_num + 1のところから(patch_num + 3)ごとにT個取る
+  // patch_numのところから(patch_num + 3)ごとにT個取る
   const int64_t num_patches = x.size(1) / T - 3;
   const int64_t tokens_per_step = num_patches + 3;
-  torch::Tensor action =
-    x.slice(1, num_patches + 1, x.size(1), tokens_per_step);  // (bs, T, kInnerDim)
-  action = predict_head_->forward(action);                    // (bs, T, kActionSize)
+  torch::Tensor action = x.slice(1, num_patches, x.size(1), tokens_per_step);  // (bs, T, kInnerDim)
+  action = predict_head_->forward(action);  // (bs, T, kActionSize)
   return action;
 }

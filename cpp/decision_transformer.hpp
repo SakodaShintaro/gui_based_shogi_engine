@@ -9,6 +9,8 @@ static constexpr int64_t kInputTimestep = 4;
 const int64_t kReturnBinNum = 2;
 const int64_t kRewardBinNum = 10;
 
+// 実装参考) https://github.com/etaoxing/multigame-dt/blob/master/multigame_dt.py#L200
+
 class DecisionTransformerImpl : public torch::nn::Module
 {
 public:
