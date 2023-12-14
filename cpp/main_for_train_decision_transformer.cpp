@@ -72,43 +72,67 @@ int main()
 
   const int64_t batch_size = 32;
 
+  auto get_data = [&](int64_t index) {
+    std::vector<torch::Tensor> curr_images(kInputTimestep);
+    std::vector<torch::Tensor> curr_returns(kInputTimestep);
+    std::vector<torch::Tensor> curr_actions(kInputTimestep);
+    std::vector<torch::Tensor> curr_rewards(kInputTimestep);
+    for (int64_t j = 0; j < kInputTimestep; j++) {
+      int64_t returns_int =
+        static_cast<int64_t>((returns[index - kInputTimestep + j] - min_return) / unit_return);
+      returns_int = std::clamp(returns_int, static_cast<int64_t>(0), kReturnBinNum - 1);
+      curr_images[j] = cv_mat_to_tensor(images[index - kInputTimestep + j]);
+      curr_returns[j] = torch::tensor(returns_int, torch::kLong);
+      curr_actions[j] = torch::tensor(actions[index - kInputTimestep + j], torch::kLong);
+      curr_rewards[j] = torch::tensor(rewards[index - kInputTimestep + j], torch::kLong);
+    }
+    return std::make_tuple(
+      torch::stack(curr_images), torch::stack(curr_returns), torch::stack(curr_actions),
+      torch::stack(curr_rewards));
+  };
+
   // 実行してみて結果を保存する
   auto save_result = [&](const std::string & path) {
-    // std::ofstream ofs(path);
-    // ofs << std::fixed;
-    // torch::NoGradGuard no_grad_guard;
-    // transformer->eval();
-    // for (int64_t i = 0; i < data_num; i += batch_size) {
-    //   std::vector<torch::Tensor> batch_images(batch_size);
-    //   std::vector<torch::Tensor> batch_actions(batch_size);
-    //   std::vector<torch::Tensor> batch_rewards(batch_size);
-    //   int64_t actual_num = 0;
-    //   for (int64_t j = 0; j < batch_size && i + j < data_num; j++) {
-    //     const int64_t index = i + j;
-    //     batch_images[j] = cv_mat_to_tensor(images[index]);
-    //     batch_actions[j] = torch::tensor(actions[index], torch::kLong);
-    //     batch_rewards[j] = torch::tensor(returns[index]);
-    //     actual_num++;
-    //   }
-    //   batch_images.resize(actual_num);
-    //   batch_actions.resize(actual_num);
-    //   batch_rewards.resize(actual_num);
+    std::ofstream ofs(path);
+    ofs << std::fixed;
+    torch::NoGradGuard no_grad_guard;
+    transformer->eval();
+    for (int64_t i = kInputTimestep; i < data_num; i += batch_size) {
+      std::vector<torch::Tensor> batch_images(batch_size);
+      std::vector<torch::Tensor> batch_returns(batch_size);
+      std::vector<torch::Tensor> batch_actions(batch_size);
+      std::vector<torch::Tensor> batch_rewards(batch_size);
+      int64_t actual_num = 0;
+      for (int64_t j = 0; j < batch_size && i + j < data_num; j++) {
+        const int64_t index = i + j;
+        const auto [curr_images, curr_returns, curr_actions, curr_rewards] = get_data(index);
+        batch_images[j] = curr_images;
+        batch_returns[j] = curr_returns;
+        batch_actions[j] = curr_actions;
+        batch_rewards[j] = curr_rewards;
+        actual_num++;
+      }
+      batch_images.resize(actual_num);
+      batch_returns.resize(actual_num);
+      batch_actions.resize(actual_num);
+      batch_rewards.resize(actual_num);
 
-    //   const torch::Tensor images = torch::stack(batch_images).to(device);
-    //   const torch::Tensor actions = torch::stack(batch_actions).to(device);
-    //   const torch::Tensor rewards = torch::stack(batch_rewards).to(device);
-    //   const torch::Tensor policy_logits = transformer->forward(images);
-    //   const torch::Tensor policy = torch::softmax(policy_logits, 1);
-    //   for (int64_t j = 0; j < batch_size && i + j < data_num; j++) {
-    //     ofs << std::setfill('0') << std::setw(8) << i + j << "\t";
-    //     ofs << batch_actions[j].item<int64_t>() << "\t";
-    //     ofs << batch_rewards[j].item<float>() << "\t";
-    //     for (int64_t k = 0; k < kActionSize; k++) {
-    //       ofs << policy[j][k].item<float>() << "\t\n"[k == kActionSize - 1];
-    //     }
-    //   }
-    // }
-    // transformer->train();
+      const torch::Tensor images = torch::stack(batch_images).to(device);
+      const torch::Tensor returns = torch::stack(batch_returns).to(device);
+      const torch::Tensor actions = torch::stack(batch_actions).to(device);
+      const torch::Tensor rewards = torch::stack(batch_rewards).to(device);
+      const torch::Tensor policy_logits = transformer->forward(images, returns, actions, rewards);
+      const torch::Tensor policy = torch::softmax(policy_logits, 2);
+      for (int64_t j = 0; j < batch_size && i + j < data_num; j++) {
+        ofs << std::setfill('0') << std::setw(8) << i + j << "\t";
+        ofs << batch_actions[j][kInputTimestep - 1].item<int64_t>() << "\t";
+        ofs << batch_rewards[j][kInputTimestep - 1].item<int64_t>() << "\t";
+        for (int64_t k = 0; k < kActionSize; k++) {
+          ofs << policy[j][kInputTimestep - 1][k].item<float>() << "\t\n"[k == kActionSize - 1];
+        }
+      }
+    }
+    transformer->train();
   };
 
   save_result(save_dir + "/policy_result_before.tsv");
@@ -123,23 +147,11 @@ int main()
     std::vector<torch::Tensor> batch_rewards(batch_size);
     for (int64_t i = 0; i < batch_size; i++) {
       const int64_t index = dist(engine);
-      std::vector<torch::Tensor> curr_images(kInputTimestep);
-      std::vector<torch::Tensor> curr_returns(kInputTimestep);
-      std::vector<torch::Tensor> curr_actions(kInputTimestep);
-      std::vector<torch::Tensor> curr_rewards(kInputTimestep);
-      for (int64_t j = 0; j < kInputTimestep; j++) {
-        int64_t returns_int =
-          static_cast<int64_t>((returns[index - kInputTimestep + j] - min_return) / unit_return);
-        returns_int = std::clamp(returns_int, static_cast<int64_t>(0), kReturnBinNum - 1);
-        curr_images[j] = cv_mat_to_tensor(images[index - kInputTimestep + j]);
-        curr_returns[j] = torch::tensor(returns_int, torch::kLong);
-        curr_actions[j] = torch::tensor(actions[index - kInputTimestep + j], torch::kLong);
-        curr_rewards[j] = torch::tensor(rewards[index - kInputTimestep + j], torch::kLong);
-      }
-      batch_images[i] = torch::stack(curr_images);
-      batch_returns[i] = torch::stack(curr_returns);
-      batch_actions[i] = torch::stack(curr_actions);
-      batch_rewards[i] = torch::stack(curr_rewards);
+      const auto [curr_images, curr_returns, curr_actions, curr_rewards] = get_data(index);
+      batch_images[i] = curr_images;
+      batch_returns[i] = curr_returns;
+      batch_actions[i] = curr_actions;
+      batch_rewards[i] = curr_rewards;
     }
 
     const torch::Tensor images = torch::stack(batch_images).to(device);
@@ -149,8 +161,8 @@ int main()
 
     // (bs, T, kActionSize)
     torch::Tensor policy_logits = transformer->forward(images, returns, actions, rewards);
+    policy_logits = torch::log_softmax(policy_logits, 2);
     policy_logits = policy_logits.view({-1, kActionSize});
-    policy_logits = torch::log_softmax(policy_logits, 1);
     // actionと交差エントロピー
     const torch::Tensor loss =
       torch::nll_loss(policy_logits, actions.flatten(), {}, torch::Reduction::Mean);
