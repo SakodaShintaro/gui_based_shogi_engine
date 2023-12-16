@@ -2,6 +2,7 @@
 #include "../cv_mat_to_tensor.hpp"
 #include "../decision_transformer.hpp"
 #include "../gui_control.hpp"
+#include "../timer.hpp"
 #include "../window_size.hpp"
 
 #include <opencv2/opencv.hpp>
@@ -15,6 +16,9 @@
 
 int main()
 {
+  Timer timer;
+  timer.start();
+
   DecisionTransformer transformer(kWindowHeight, kWindowWidth, kPatchSize);
   const torch::Device device(torch::kCUDA);
   transformer->to(device);
@@ -134,7 +138,10 @@ int main()
   std::mt19937_64 engine(std::random_device{}());
   std::uniform_int_distribution<int64_t> dist(kInputTimestep, data_num);
 
-  for (int64_t itr = 0; itr < 1000; itr++) {
+  constexpr int64_t kPrintInterval = 10;
+  float sum_loss_interval = 0.0f;
+
+  for (int64_t itr = 0; itr < 2000; itr++) {
     std::vector<torch::Tensor> batch_images(batch_size);
     std::vector<torch::Tensor> batch_returns(batch_size);
     std::vector<torch::Tensor> batch_actions(batch_size);
@@ -164,10 +171,17 @@ int main()
     optimizer.zero_grad();
     loss.backward();
     optimizer.step();
-    std::stringstream ss;
-    ss << itr << "\t" << loss.item<float>() << std::endl;
-    std::cout << ss.str();
-    ofs << ss.str();
+
+    sum_loss_interval += loss.item<float>();
+    if ((itr + 1) % kPrintInterval == 0) {
+      sum_loss_interval /= kPrintInterval;
+      std::stringstream ss;
+      ss << std::fixed << timer.elapsed_time() << "\t" << itr + 1 << "\t" << sum_loss_interval
+         << std::endl;
+      std::cout << ss.str();
+      ofs << ss.str();
+      sum_loss_interval = 0.0f;
+    }
   }
 
   save_result(save_dir + "/policy_result_after.tsv");
