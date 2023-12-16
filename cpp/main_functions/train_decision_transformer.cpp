@@ -23,7 +23,11 @@ int main()
   const torch::Device device(torch::kCUDA);
   transformer->to(device);
 
-  torch::optim::Adam optimizer(transformer->parameters(), torch::optim::AdamOptions(1e-4));
+  torch::optim::AdamWOptions options;
+  options.set_lr(1e-4);
+  options.weight_decay(0.1);
+  options.betas({0.9, 0.999});
+  torch::optim::AdamW optimizer(transformer->parameters(), options);
 
   const std::string data_root_dir = "./data/";
   const std::string data_image_dir = data_root_dir + "/play/image/";
