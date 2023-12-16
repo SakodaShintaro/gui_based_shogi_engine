@@ -5,7 +5,7 @@
 
 #include <torch/torch.h>
 
-torch::Tensor cv_mat_to_tensor(const cv::Mat & cv_img)
+inline torch::Tensor cv_mat_to_tensor(const cv::Mat & cv_img)
 {
   const int height = cv_img.rows;
   const int width = cv_img.cols;

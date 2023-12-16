@@ -1,8 +1,8 @@
-#include "action.hpp"
-#include "cv_mat_to_tensor.hpp"
-#include "gui_control.hpp"
-#include "neural_network.hpp"
-#include "window_size.hpp"
+#include "../action.hpp"
+#include "../cv_mat_to_tensor.hpp"
+#include "../gui_control.hpp"
+#include "../neural_network.hpp"
+#include "../window_size.hpp"
 
 #include <opencv2/opencv.hpp>
 

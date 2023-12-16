@@ -10,23 +10,17 @@ find_package(OpenCV REQUIRED)
 list(APPEND CMAKE_PREFIX_PATH ../libtorch-2.1.1)
 find_package(Torch REQUIRED)
 
-# main_for_play
-add_executable(main_for_play
-  cpp/main_for_play.cpp
-  cpp/neural_network.cpp)
-target_include_directories(main_for_play PUBLIC ${OpenCV_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS} ${TORCH_INCLUDE})
-target_link_libraries(main_for_play ${X11_LIBRARIES} ${OpenCV_LIBS} ${TORCH_LIBRARIES})
+file(GLOB cpp_files cpp/*.cpp)
 
-# main_for_offline_training
-add_executable(main_for_offline_training
-  cpp/main_for_offline_training.cpp
-  cpp/neural_network.cpp)
-target_include_directories(main_for_offline_training PUBLIC ${OpenCV_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS} ${TORCH_INCLUDE})
-target_link_libraries(main_for_offline_training ${X11_LIBRARIES} ${OpenCV_LIBS} ${CUDA_LIBRARIES} ${TORCH_LIBRARIES})
+macro(define_app name)
+  get_filename_component(binary_name ${name} NAME_WE)
+  add_executable(${binary_name} ${name} ${cpp_files})
+  target_include_directories(${binary_name} PUBLIC ${OpenCV_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS} ${TORCH_INCLUDE})
+  target_link_libraries(${binary_name} ${X11_LIBRARIES} ${OpenCV_LIBS} ${TORCH_LIBRARIES})
+endmacro()
 
-# main_for_train_decision_transformer
-add_executable(main_for_train_decision_transformer
-  cpp/main_for_train_decision_transformer.cpp
-  cpp/decision_transformer.cpp)
-target_include_directories(main_for_train_decision_transformer PUBLIC ${OpenCV_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS} ${TORCH_INCLUDE})
-target_link_libraries(main_for_train_decision_transformer ${X11_LIBRARIES} ${OpenCV_LIBS} ${CUDA_LIBRARIES} ${TORCH_LIBRARIES})
+# main
+define_app(cpp/main_functions/play_policy.cpp)
+define_app(cpp/main_functions/train_policy.cpp)
+define_app(cpp/main_functions/play_decision_transformer.cpp)
+define_app(cpp/main_functions/train_decision_transformer.cpp)
