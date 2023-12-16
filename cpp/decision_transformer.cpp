@@ -18,7 +18,6 @@ DecisionTransformerImpl::DecisionTransformerImpl(int64_t h, int64_t w, int64_t p
   image_pos_enc_ =
     register_parameter("image_pose_enc_", torch::randn({1, 1, num_patches, kInnerDim}));
 
-  return_enc_ = register_module("return_enc", Embedding(kReturnBinNum, kInnerDim));
   action_enc_ = register_module("action_enc", Embedding(kActionSize, kInnerDim));
   reward_enc_ = register_module("reward_enc", Embedding(kRewardBinNum, kInnerDim));
 
@@ -76,9 +75,9 @@ torch::Tensor DecisionTransformerImpl::forward(
   images = images.flatten(2);                    // (bs, T, ph * pw * kInnerDim)
 
   // encode returns, actions, rewards
-  returns = return_enc_->forward(returns);  // (bs, T, kInnerDim)
-  actions = action_enc_->forward(actions);  // (bs, T, kInnerDim)
-  rewards = reward_enc_->forward(rewards);  // (bs, T, kInnerDim)
+  returns = encode_scalar(returns, kInnerDim, 10000);  // (bs, T, kInnerDim)
+  actions = action_enc_->forward(actions);             // (bs, T, kInnerDim)
+  rewards = reward_enc_->forward(rewards);             // (bs, T, kInnerDim)
 
   // concat
   torch::Tensor x =

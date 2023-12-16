@@ -5,9 +5,10 @@
 
 #include <torch/torch.h>
 
-static constexpr int64_t kInputTimestep = 4;
-const int64_t kReturnBinNum = 10;
-const int64_t kRewardBinNum = 2;
+static constexpr int64_t kInputTimestep = 16;
+static constexpr int64_t kRewardBinNum = 2;
+static constexpr int64_t kPatchSize = 50;
+static constexpr float kReturnScale = 1000.0f;
 
 // 実装参考) https://github.com/etaoxing/multigame-dt/blob/master/multigame_dt.py#L200
 
@@ -36,7 +37,6 @@ private:
 
   torch::nn::Conv2d first_conv_ = nullptr;
   torch::Tensor image_pos_enc_;
-  torch::nn::Embedding return_enc_ = nullptr;
   torch::nn::Embedding action_enc_ = nullptr;
   torch::nn::Embedding reward_enc_ = nullptr;
   torch::Tensor positional_embedding_;

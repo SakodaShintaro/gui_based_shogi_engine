@@ -2,7 +2,6 @@
 #include "../cv_mat_to_tensor.hpp"
 #include "../decision_transformer.hpp"
 #include "../gui_control.hpp"
-#include "../neural_network.hpp"
 #include "../window_size.hpp"
 
 #include <opencv2/opencv.hpp>
@@ -29,14 +28,14 @@ int main()
   std::ofstream ofs(save_root_dir + "/info.tsv");
   ofs << "itr\taction\treward" << std::endl;
 
-  DecisionTransformer actor(kWindowHeight, kWindowWidth, 50);
-  const std::string model_path = save_root_dir + "/../offline_training/transformer.pt";
+  DecisionTransformer dt(kWindowHeight, kWindowWidth, kPatchSize);
+  const std::string model_path = save_root_dir + "/../decision_transformer/transformer.pt";
   if (std::filesystem::exists(model_path)) {
-    torch::load(actor, model_path);
+    torch::load(dt, model_path);
     std::cout << "load!" << std::endl;
   }
   const torch::Device device(torch::kCUDA);
-  actor->to(device);
+  dt->to(device);
 
   cv::Mat next_image_without_cursor;
 
@@ -45,7 +44,7 @@ int main()
   //   actions : (bs, T)
   //   rewards : (bs, T)
   torch::Tensor images = torch::zeros({1, kInputTimestep, 3, kWindowHeight, kWindowWidth});
-  torch::Tensor returns = torch::zeros({1, kInputTimestep}, torch::kLong);
+  torch::Tensor returns = torch::zeros({1, kInputTimestep}, torch::kFloat);
   torch::Tensor actions = torch::zeros({1, kInputTimestep}, torch::kLong);
   torch::Tensor rewards = torch::zeros({1, kInputTimestep}, torch::kLong);
 
@@ -55,7 +54,7 @@ int main()
   rewards = rewards.to(device);
 
   for (int64_t i = 0; i < kInputTimestep; i++) {
-    returns[0][i] = kReturnBinNum - 1;
+    returns[0][i] = kReturnScale;
   }
 
   for (int64 itr = 0; itr < 10000; itr++) {
@@ -104,7 +103,7 @@ int main()
     torch::Tensor input_tensor = cv_mat_to_tensor(curr_image_with_cursor);
     input_tensor = input_tensor.to(device);
     images[0][kInputTimestep - 1] = input_tensor;
-    torch::Tensor action_tensor = actor->forward(images, returns, actions, rewards);
+    torch::Tensor action_tensor = dt->forward(images, returns, actions, rewards);
     torch::Tensor softmax_tensor = torch::softmax(action_tensor, 2);
     softmax_tensor = softmax_tensor[0][kInputTimestep - 1];
     const int64_t action_index = torch::multinomial(softmax_tensor, 1).item<int64_t>();

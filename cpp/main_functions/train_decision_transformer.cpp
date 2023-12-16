@@ -15,7 +15,7 @@
 
 int main()
 {
-  DecisionTransformer transformer(kWindowHeight, kWindowWidth, 25);
+  DecisionTransformer transformer(kWindowHeight, kWindowWidth, kPatchSize);
   const torch::Device device(torch::kCUDA);
   transformer->to(device);
 
@@ -65,11 +65,6 @@ int main()
     returns[i] = gamma * returns[i + 1] + rewards[i];
   }
 
-  const float max_return = *std::max_element(returns.begin(), returns.end());
-  const float min_return = *std::min_element(returns.begin(), returns.end());
-  const float width_return = max_return - min_return;
-  const float unit_return = width_return / kReturnBinNum;
-
   const int64_t batch_size = 32;
 
   auto get_data = [&](int64_t index) {
@@ -78,11 +73,9 @@ int main()
     std::vector<torch::Tensor> curr_actions(kInputTimestep);
     std::vector<torch::Tensor> curr_rewards(kInputTimestep);
     for (int64_t j = 0; j < kInputTimestep; j++) {
-      int64_t returns_int =
-        static_cast<int64_t>((returns[index - kInputTimestep + j] - min_return) / unit_return);
-      returns_int = std::clamp(returns_int, static_cast<int64_t>(0), kReturnBinNum - 1);
       curr_images[j] = cv_mat_to_tensor(images[index - kInputTimestep + j]);
-      curr_returns[j] = torch::tensor(returns_int, torch::kLong);
+      curr_returns[j] =
+        torch::tensor(returns[index - kInputTimestep + j] * kReturnScale, torch::kFloat);
       curr_actions[j] = torch::tensor(actions[index - kInputTimestep + j], torch::kLong);
       curr_rewards[j] = torch::tensor(rewards[index - kInputTimestep + j], torch::kLong);
     }
@@ -125,6 +118,7 @@ int main()
       const torch::Tensor policy = torch::softmax(policy_logits, 2);
       for (int64_t j = 0; j < batch_size && i + j < data_num; j++) {
         ofs << std::setfill('0') << std::setw(8) << i + j << "\t";
+        ofs << batch_returns[j][kInputTimestep - 1].item<float>() << "\t";
         ofs << batch_actions[j][kInputTimestep - 1].item<int64_t>() << "\t";
         ofs << batch_rewards[j][kInputTimestep - 1].item<int64_t>() << "\t";
         for (int64_t k = 0; k < kActionSize; k++) {
