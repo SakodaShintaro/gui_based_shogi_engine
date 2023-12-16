@@ -97,3 +97,29 @@ torch::Tensor DecisionTransformerImpl::forward(
   action = predict_head_->forward(action);  // (bs, T, kActionSize)
   return action;
 }
+
+torch::Tensor DecisionTransformerImpl::scalar_encoding(
+  torch::Tensor x, const int64_t dim, const int64_t base)
+{
+  /*
+    Embed a real number, similar to the positional encoding in Transformers.
+    PE(pos, 2i + 0) = sin(pos / base^(2i * d))
+    PE(pos, 2i + 1) = cos(pos / base^(2i * d))
+
+    Args:
+    x (torch.Tensor): [n] or [n, 1].
+
+    Returns:
+    torch.Tensor: [n, dim]
+  */
+  assert(dim % 2 == 0);
+  torch::Tensor indices = torch::arange(dim / 2);
+  torch::Tensor div_term = torch::pow(base, 2 * indices / dim);
+  div_term = div_term.unsqueeze(0);
+  x = x.view({x.size(0), 1});
+  torch::Tensor theta = x / div_term;
+  torch::Tensor embed_vector = torch::zeros({x.size(0), dim});
+  embed_vector.slice(1, 0, dim, 2) = torch::sin(theta);
+  embed_vector.slice(1, 1, dim, 2) = torch::cos(theta);
+  return embed_vector;
+}
