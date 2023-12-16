@@ -32,7 +32,7 @@ public:
     torch::Tensor images, torch::Tensor returns, torch::Tensor actions, torch::Tensor rewards);
 
 private:
-  static torch::Tensor scalar_encoding(torch::Tensor x, const int64_t dim, const int64_t base);
+  static torch::Tensor encode_scalar(torch::Tensor x, const int64_t dim, const int64_t base);
 
   torch::nn::Conv2d first_conv_ = nullptr;
   torch::Tensor image_pos_enc_;
