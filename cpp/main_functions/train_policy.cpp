@@ -23,7 +23,7 @@ int main()
 
   const std::string data_root_dir = "./data/";
   const std::string data_image_dir = data_root_dir + "/play/image/";
-  const std::string save_dir = data_root_dir + "/offline_training/";
+  const std::string save_dir = data_root_dir + "/decision_transformer/";
   std::filesystem::create_directories(save_dir);
   std::ofstream ofs(save_dir + "/log.tsv");
 
