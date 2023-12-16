@@ -73,7 +73,7 @@ int main()
     returns[i] = gamma * returns[i + 1] + rewards[i];
   }
 
-  const int64_t batch_size = 32;
+  const int64_t batch_size = 64;
 
   auto get_data = [&](int64_t index) {
     std::vector<torch::Tensor> curr_images(kInputTimestep);
