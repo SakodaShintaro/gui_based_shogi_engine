@@ -142,10 +142,10 @@ int main()
   std::mt19937_64 engine(std::random_device{}());
   std::uniform_int_distribution<int64_t> dist(kInputTimestep, data_num);
 
-  constexpr int64_t kPrintInterval = 10;
+  constexpr int64_t kPrintInterval = 20;
   float sum_loss_interval = 0.0f;
 
-  for (int64_t itr = 0; itr < 2000; itr++) {
+  for (int64_t itr = 0; itr < 4000; itr++) {
     std::vector<torch::Tensor> batch_images(batch_size);
     std::vector<torch::Tensor> batch_returns(batch_size);
     std::vector<torch::Tensor> batch_actions(batch_size);
