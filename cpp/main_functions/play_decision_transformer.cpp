@@ -150,7 +150,11 @@ int main()
       rewards[0][i] = rewards[0][i + 1];
     }
 
-    ofs << itr << "\t" << action_index << "\t" << reward << std::endl;
+    std::stringstream ss;
+    ss << std::fixed << itr << "\t" << action_index << "\t"
+       << softmax_tensor[action_index].item<float>() << "\t" << reward << std::endl;
+    ofs << ss.str();
+    std::cout << ss.str();
   }
 
   XCloseDisplay(display);
