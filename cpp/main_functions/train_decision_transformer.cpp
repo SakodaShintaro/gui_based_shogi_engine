@@ -32,6 +32,7 @@ int main()
   const std::string data_root_dir = "./data/";
   const std::string data_image_dir = data_root_dir + "/play/image/";
   const std::string save_dir = data_root_dir + "/decision_transformer/";
+  std::filesystem::remove_all(save_dir);
   std::filesystem::create_directories(save_dir);
   std::ofstream ofs(save_dir + "/log.tsv");
 
@@ -98,7 +99,7 @@ int main()
     ofs << std::fixed;
     torch::NoGradGuard no_grad_guard;
     transformer->eval();
-    for (int64_t i = kInputTimestep; i < data_num; i += batch_size) {
+    for (int64_t i = kInputTimestep; i < data_num; i += batch_size * 10) {
       std::vector<torch::Tensor> batch_images(batch_size);
       std::vector<torch::Tensor> batch_returns(batch_size);
       std::vector<torch::Tensor> batch_actions(batch_size);
