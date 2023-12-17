@@ -39,7 +39,7 @@ int main()
 
   cv::Mat next_image_without_cursor;
 
-  for (int64 itr = 0; itr < 10000; itr++) {
+  for (int64 itr = 0; itr < 100000; itr++) {
     auto now = std::chrono::system_clock::now();
     std::time_t end_time = std::chrono::system_clock::to_time_t(now);
 

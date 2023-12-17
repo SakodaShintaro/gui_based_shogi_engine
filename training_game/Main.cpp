@@ -7,7 +7,7 @@ void Main()
   s3d::Circle circle;
   ColorF circle_color;
   Window::Resize(kWindowWidth, kWindowHeight);
-  const int64_t radius = std::min(kWindowWidth, kWindowHeight) / 2;
+  const int64_t radius = std::min(kWindowWidth, kWindowHeight) / 4;
 
   auto update = [&]() {
     // Scene::SetBackground(RandomColorF());
