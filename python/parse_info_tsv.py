@@ -14,4 +14,4 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     df = pd.read_csv(args.info_tsv, sep='\t')
-    print(f"合計 {df['reward'].sum()}")
+    print(f"合計 {df['reward'].sum()}成功 {df['reward'].mean() * 100:5.2f}%")
