@@ -8,11 +8,10 @@ int main()
   // テーブルの初期化
   const int64_t kTableSize = kGridSize * kGridSize * kGridSize * kGridSize;
   torch::Tensor policy_table = torch::zeros({kTableSize, kActionSize}).requires_grad_(true);
-  torch::Tensor value_table = torch::zeros({kTableSize});
+  torch::Tensor value_table = torch::zeros({kTableSize}).requires_grad_(true);
 
-  torch::optim::SGD optimizer({policy_table}, 1.0);
+  torch::optim::SGD optimizer({policy_table, value_table}, 1.0);
 
-  constexpr float kAlpha = 0.1;  // 学習率
   constexpr float kGamma = 0.9;  // 割引率
 
   int64_t success_num = 0;
@@ -36,21 +35,18 @@ int main()
     std::cout << "i = " << i << ", action = " << action << ", reward = " << reward
               << ", success_num = " << success_num << std::endl;
 
-    // 関数を更新
-    // 状態価値を更新
+    // 損失を計算
     const int64_t ns = grid.state_as_int();
     const float next_value = torch::max(value_table[ns]).item<float>();
     torch::Tensor td = reward + kGamma * next_value - value_table[s];
-    std::cout << value_table[s].item<float>() << " ";
-    value_table[s] += kAlpha * td;
-    std::cout << value_table[s].item<float>() << std::endl;
+    torch::Tensor value_loss = 0.1 * td * td;
 
-    // 損失を計算
     torch::Tensor log_prob = torch::log_softmax(policy_table[s], 0)[action];
-    torch::Tensor actor_loss = -log_prob * td;
+    torch::Tensor actor_loss = -log_prob * td.detach();
 
-    // 勾配降下で方策を更新
+    // 更新
     optimizer.zero_grad();
+    value_loss.backward();
     actor_loss.backward();
     optimizer.step();
   }
