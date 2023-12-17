@@ -7,7 +7,7 @@ int main()
 
   // Qテーブルの初期化
   const int64_t kTableSize = kGridSize * kGridSize * kGridSize * kGridSize;
-  std::array<std::array<float, kActionSize>, kTableSize> q_table{};
+  torch::Tensor q_table = torch::zeros({kTableSize, kActionSize});
 
   std::mt19937_64 engine(std::random_device{}());
   std::uniform_real_distribution<float> dist(0.0, 1.0);
@@ -29,9 +29,7 @@ int main()
     if (dist(engine) < kEpsilon) {
       action = dist_action(engine);
     } else {
-      const std::array<float, kActionSize> & curr_table = q_table[s];
-      const auto itr = std::max_element(curr_table.begin(), curr_table.end());
-      action = itr - curr_table.begin();
+      action = torch::argmax(q_table[s], 0).item<int64_t>();
     }
 
     // 行動aを実行し、r, s'を観測
@@ -44,7 +42,7 @@ int main()
               << ", success_num = " << success_num << std::endl;
 
     // Q関数を更新
-    const float max_future_q = *std::max_element(q_table[ns].begin(), q_table[ns].end());
+    const float max_future_q = torch::max(q_table[ns]).item<float>();
     q_table[s][action] += kAlpha * (reward + kGamma * max_future_q - q_table[s][action]);
   }
 }
