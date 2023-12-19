@@ -1,5 +1,7 @@
 #include "../grid_world.hpp"
 
+#include <fstream>
+
 int main()
 {
   const int64_t kGridSize = 3;
@@ -15,6 +17,9 @@ int main()
   constexpr float kGamma = 0.9;  // 割引率
 
   int64_t success_num = 0;
+
+  std::ofstream ofs("grid_world_log.tsv");
+  ofs << std::fixed << "iteration\tvalue_loss\tpolicy_loss\tsuccess\tis_ideal_action\n";
 
   for (int64_t i = 0; i < 10000; i++) {
     grid.print();
@@ -53,5 +58,9 @@ int main()
     value_loss.backward();
     actor_loss.backward();
     optimizer.step();
+
+    // ログを記録
+    ofs << i << "\t" << value_loss.item<float>() << "\t" << actor_loss.item<float>() << "\t"
+        << success << "\t" << is_ideal_action << std::endl;
   }
 }
