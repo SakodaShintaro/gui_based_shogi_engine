@@ -4,7 +4,7 @@
 
 int main()
 {
-  const int64_t kGridSize = 3;
+  const int64_t kGridSize = 4;
   GridWorld grid(kGridSize);
 
   // テーブルの初期化
@@ -21,7 +21,7 @@ int main()
   std::ofstream ofs("grid_world_log.tsv");
   ofs << std::fixed << "iteration\tvalue_loss\tpolicy_loss\tsuccess\tis_ideal_action\n";
 
-  for (int64_t i = 0; i < 10000; i++) {
+  for (int64_t i = 0; i < 20000; i++) {
     grid.print();
 
     // 現在の状態を取得
