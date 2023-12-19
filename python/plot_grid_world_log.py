@@ -16,7 +16,7 @@ if __name__ == "__main__":
     df = pd.read_csv(tsv_path, sep='\t')
     print(df.head())
 
-    window_size = 100
+    window_size = 200
     mean = df["is_ideal_action"].rolling(window_size).mean()
 
     plt.plot(df["iteration"], mean)
