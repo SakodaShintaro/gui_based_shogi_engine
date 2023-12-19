@@ -10,6 +10,7 @@
 struct Position
 {
   int64_t x, y;
+  bool operator==(const Position rhs) const { return (x == rhs.x && y == rhs.y); }
 };
 
 class GridWorld
@@ -22,6 +23,8 @@ public:
   bool step(const Action action);
 
   torch::Tensor state() const;
+
+  bool is_ideal_action(const Action action) const;
 
   int64_t state_as_int() const
   {

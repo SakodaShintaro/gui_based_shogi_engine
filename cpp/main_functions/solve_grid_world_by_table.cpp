@@ -27,13 +27,17 @@ int main()
     std::cout << policy << std::endl;
     const int64_t action = torch::multinomial(policy, 1).item<int64_t>();
 
+    // 最適判定
+    const bool is_ideal_action = grid.is_ideal_action(static_cast<Action>(action));
+
     // 行動aを実行し、r, nsを観測
     const bool success = grid.step(static_cast<Action>(action));
     const float reward = (success ? 1.0 : -0.1);
     success_num += success;
 
     std::cout << "i = " << i << ", action = " << action << ", reward = " << reward
-              << ", success_num = " << success_num << std::endl;
+              << ", success_num = " << success_num << ", is_ideal = " << is_ideal_action
+              << std::endl;
 
     // 損失を計算
     const int64_t ns = grid.state_as_int();

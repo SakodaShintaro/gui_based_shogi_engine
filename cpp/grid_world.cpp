@@ -26,8 +26,7 @@ void GridWorld::print() const
 bool GridWorld::step(const Action action)
 {
   if (action == kClick) {
-    const bool same =
-      (self_position_.x == goal_position_.x && self_position_.y == goal_position_.y);
+    const bool same = (self_position_ == goal_position_);
     if (same) {
       goal_position_.x = dist_(engine_);
       goal_position_.y = dist_(engine_);
@@ -57,4 +56,24 @@ torch::Tensor GridWorld::state() const
   state[0][self_position_.y][self_position_.y] = 1;
   state[1][goal_position_.y][goal_position_.y] = 1;
   return state;
+}
+
+bool GridWorld::is_ideal_action(const Action action) const
+{
+  const bool same = (self_position_ == goal_position_);
+  if (same) {
+    return (action == kClick);
+  } else {
+    const int64_t dx = goal_position_.x - self_position_.x;
+    const int64_t dy = goal_position_.y - self_position_.y;
+    if (action == kUp) {
+      return (dy < 0);
+    } else if (action == kRight) {
+      return (dx > 0);
+    } else if (action == kDown) {
+      return (dy > 0);
+    } else if (action == kLeft) {
+      return (dx < 0);
+    }
+  }
 }
