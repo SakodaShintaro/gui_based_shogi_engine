@@ -31,21 +31,22 @@ class NeuralNetwork(nn.Module):
         nn.init.constant_(self.policy_embedding.weight, 0)
         nn.init.constant_(self.value_embedding.weight, 0)
 
-    def forward(self, x):
+    def forward(self, input_x):
         # x : [bs, 2, h, w]
         # NN推論する場合
+        # x = input_x
         # for layer in self.conv_layers:
         #     x = layer(x)
         #     x = nn.ReLU()(x)
-        # x = x.flatten()
+        # x = x.flatten(1)
         # policy = self.linear_policy(x)
         # value = self.linear_value(x)
 
         # テーブルベースで考える場合
         # 1になっているindexを取得する
-        x = x.flatten(2)  # [bs, 2, h * w]
-        dim0 = x[:, 0].nonzero(as_tuple=False)
-        dim1 = x[:, 1].nonzero(as_tuple=False)
+        input_x = input_x.flatten(2)  # [bs, 2, h * w]
+        dim0 = input_x[:, 0].nonzero(as_tuple=False)
+        dim1 = input_x[:, 1].nonzero(as_tuple=False)
         dim0 = dim0[:, 1]
         dim1 = dim1[:, 1]
         index = dim0 * self.square + dim1
@@ -59,7 +60,7 @@ def main():
     kGridSize = 4
     grid = GridWorld(kGridSize)
 
-    device = torch.device("cuda")
+    device = torch.device("cpu")
 
     network = NeuralNetwork(kGridSize, kGridSize)
     network.to(device)
@@ -107,7 +108,7 @@ def main():
 
         # 学習フェーズ
         network.train()
-        samples = buffer.sample(1)
+        samples = buffer.sample(4)
         if samples is None:
             continue
 
@@ -132,16 +133,16 @@ def main():
 
         log_prob = torch.log_softmax(train_policies, 1)
         log_prob = log_prob.gather(1, actions.unsqueeze(1))
-        actor_loss = -log_prob * td.detach()
+        policy_loss = -log_prob * td.detach()
 
-        loss = actor_loss + 0.1 * value_loss
+        loss = policy_loss + 0.1 * value_loss
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
         f.write(
-            f"{i}\t{value_loss.item():.4f}\t{actor_loss.item():.4f}\t{success}\t{is_ideal_action}\n")
+            f"{i}\t{value_loss.item():.4f}\t{policy_loss.item():.4f}\t{success}\t{is_ideal_action}\n")
 
 
 if __name__ == "__main__":
