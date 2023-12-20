@@ -32,6 +32,9 @@ public:
     const int64_t s2 = square_ * square_;
     policy_embedding_ = register_module("policy_embedding", Embedding(s2, kActionSize));
     value_embedding_ = register_module("value_embedding", Embedding(s2, 1));
+
+    torch::nn::init::constant_(policy_embedding_->weight, 0);
+    torch::nn::init::constant_(value_embedding_->weight, 0);
   }
 
   std::pair<torch::Tensor, torch::Tensor> forward(torch::Tensor input)
@@ -84,12 +87,8 @@ int main()
   GridWorld grid(kGridSize);
 
   NeuralNetwork network(kGridSize, kGridSize);
-  const int64_t kTableSize = kGridSize * kGridSize * kGridSize * kGridSize;
-  torch::Tensor value_table = torch::zeros({kTableSize}).requires_grad_(true);
 
-  std::vector<torch::Tensor> parameters = network->parameters();
-  parameters.push_back(value_table);
-  torch::optim::SGD optimizer(parameters, 1.0);
+  torch::optim::SGD optimizer(network->parameters(), 1.0);
 
   constexpr float kGamma = 0.9;  // 割引率
 
@@ -106,12 +105,10 @@ int main()
 
     // 現在の状態を取得
     torch::Tensor state = grid.state();
-    const int64_t s = grid.state_as_int();
 
     // 行動選択
-    const auto [policy_logit, _v] = network->forward(state);
+    const auto [policy_logit, value] = network->forward(state);
     torch::Tensor policy = torch::softmax(policy_logit, 0);
-    torch::Tensor value = value_table[s];
     const int64_t action = torch::multinomial(policy, 1).item<int64_t>();
 
     // 最適判定
@@ -128,9 +125,9 @@ int main()
     const float reward = (success ? 1.0 : -0.1);
 
     // 損失を計算
-    const int64_t ns = grid.state_as_int();
-    const float next_value = torch::max(value_table[ns]).item<float>();
-    torch::Tensor td = reward + kGamma * next_value - value;
+    torch::Tensor next_state = grid.state();
+    const auto [_next_policy_logit, next_value] = network->forward(next_state);
+    torch::Tensor td = reward + kGamma * next_value.item<float>() - value;
     torch::Tensor value_loss = td * td;
 
     torch::Tensor log_prob = torch::log_softmax(policy_logit, 0)[action];
