@@ -4,6 +4,7 @@ import torch.optim as optim
 from collections import deque
 from grid_world import GridWorld
 from action import *
+from replay_buffer import ReplayBuffer
 
 
 class NeuralNetwork(nn.Module):
@@ -62,6 +63,8 @@ def main():
 
     optimizer = optim.SGD(network.parameters(), 1.0)
 
+    buffer = ReplayBuffer(2)
+
     kGamma = 0.9  # 割引率
 
     is_ideal_actions = deque()
@@ -72,6 +75,7 @@ def main():
 
     for i in range(20000):
         print("")
+        # 実行フェーズ
         grid.print()
 
         state = grid.state()
@@ -92,13 +96,36 @@ def main():
         success = grid.step(action)
         reward = 1.0 if success else -0.1
 
-        next_state = grid.state()
-        next_state = torch.tensor(next_state, dtype=torch.float32)
-        _, next_value = network(next_state.unsqueeze(0))
-        td = reward + kGamma * next_value[0].item() - value
+        buffer.push(state, action, reward, value.item())
+        ideal_rate = 100.0 * ideal_action_num / kWindowSize
+        print(f"i = {i:6d}, action = {action}, reward = {reward:+.1f} value = {value.item():+.4f} ideal_action_rate = {ideal_rate:5.1f} is_ideal = {is_ideal_action}")
+
+        # 学習フェーズ
+        samples = buffer.sample(1)
+        if samples is None:
+            continue
+
+        states = []
+        actions = []
+        value_targets = []
+
+        for sample in samples:
+            states.append(sample[0].state)
+            actions.append(sample[0].action)
+            value_target = sample[-1].value
+            for index in range(len(sample) - 2, -1, -1):
+                value_target = kGamma * value_target + sample[index].reward
+            value_targets.append(value_target)
+        states = torch.stack(states)
+        actions = torch.tensor(actions)
+        value_targets = torch.tensor(value_targets)
+
+        train_policies, train_values = network(states)
+        td = value_targets - train_values
         value_loss = td * td
 
-        log_prob = torch.log_softmax(policy_logit, 0)[action]
+        log_prob = torch.log_softmax(train_policies, 1)
+        log_prob = log_prob.gather(1, actions.unsqueeze(1))
         actor_loss = -log_prob * td.detach()
 
         loss = actor_loss + 0.1 * value_loss
@@ -107,7 +134,6 @@ def main():
         loss.backward()
         optimizer.step()
 
-        print(f"i = {i:6d}, action = {action}, reward = {reward:.1f} value = {value.item():.4f} td = {td.item():.4f} ideal_action_rate = {100.0 * ideal_action_num / kWindowSize} is_ideal = {is_ideal_action}")
         f.write(
             f"{i}\t{value_loss.item():.4f}\t{actor_loss.item():.4f}\t{success}\t{is_ideal_action}\n")
 
