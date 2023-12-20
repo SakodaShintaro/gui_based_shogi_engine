@@ -130,10 +130,12 @@ def main():
         train_policies, train_values = network(states)
         td = value_targets - train_values
         value_loss = td * td
+        value_loss = value_loss.mean()
 
         log_prob = torch.log_softmax(train_policies, 1)
         log_prob = log_prob.gather(1, actions.unsqueeze(1))
         policy_loss = -log_prob * td.detach()
+        policy_loss = policy_loss.mean()
 
         loss = policy_loss + 0.1 * value_loss
 
