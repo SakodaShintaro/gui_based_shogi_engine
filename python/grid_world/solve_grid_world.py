@@ -59,7 +59,10 @@ def main():
     kGridSize = 4
     grid = GridWorld(kGridSize)
 
+    device = torch.device("cuda")
+
     network = NeuralNetwork(kGridSize, kGridSize)
+    network.to(device)
 
     optimizer = optim.SGD(network.parameters(), 1.0)
 
@@ -76,10 +79,12 @@ def main():
     for i in range(20000):
         print("")
         # 実行フェーズ
+        network.eval()
         grid.print()
 
         state = grid.state()
         state = torch.tensor(state, dtype=torch.float32)
+        state = state.to(device)
 
         policy_logit, value = network(state.unsqueeze(0))
         policy_logit = policy_logit[0]
@@ -101,6 +106,7 @@ def main():
         print(f"i = {i:6d}, action = {action}, reward = {reward:+.1f} value = {value.item():+.4f} ideal_action_rate = {ideal_rate:5.1f} is_ideal = {is_ideal_action}")
 
         # 学習フェーズ
+        network.train()
         samples = buffer.sample(1)
         if samples is None:
             continue
@@ -116,9 +122,9 @@ def main():
             for index in range(len(sample) - 2, -1, -1):
                 value_target = kGamma * value_target + sample[index].reward
             value_targets.append(value_target)
-        states = torch.stack(states)
-        actions = torch.tensor(actions)
-        value_targets = torch.tensor(value_targets)
+        states = torch.stack(states).to(device)
+        actions = torch.tensor(actions).to(device)
+        value_targets = torch.tensor(value_targets).to(device)
 
         train_policies, train_values = network(states)
         td = value_targets - train_values
