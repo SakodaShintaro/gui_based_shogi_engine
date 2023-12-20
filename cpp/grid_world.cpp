@@ -53,8 +53,8 @@ bool GridWorld::step(const Action action)
 torch::Tensor GridWorld::state() const
 {
   torch::Tensor state = torch::zeros({2, grid_size_, grid_size_});
-  state[0][self_position_.y][self_position_.y] = 1;
-  state[1][goal_position_.y][goal_position_.y] = 1;
+  state[0][self_position_.y][self_position_.x] = 1;
+  state[1][goal_position_.y][goal_position_.x] = 1;
   return state;
 }
 
