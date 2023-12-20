@@ -12,7 +12,7 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    tsv_path = args.tsv_path
+    tsv_path = os.path.abspath(args.tsv_path)
     df = pd.read_csv(tsv_path, sep='\t')
     print(df.head())
 
