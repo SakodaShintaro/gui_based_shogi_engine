@@ -31,6 +31,7 @@ class NeuralNetwork(nn.Module):
         nn.init.constant_(self.value_embedding.weight, 0)
 
     def forward(self, x):
+        # x : [bs, 2, h, w]
         # NN推論する場合
         # for layer in self.conv_layers:
         #     x = layer(x)
@@ -40,13 +41,15 @@ class NeuralNetwork(nn.Module):
         # value = self.linear_value(x)
 
         # テーブルベースで考える場合
-        one = (x[0] == 1).nonzero(as_tuple=True)
-        two = (x[1] == 1).nonzero(as_tuple=True)
-        one_index = one[0] * self.w + one[1]
-        two_index = two[0] * self.w + two[1]
-        index = one_index * self.square + two_index
-        policy = self.policy_embedding(index)[0]
-        value = self.value_embedding(index)[0]
+        # 1になっているindexを取得する
+        x = x.flatten(2)  # [bs, 2, h * w]
+        dim0 = x[:, 0].nonzero(as_tuple=False)
+        dim1 = x[:, 1].nonzero(as_tuple=False)
+        dim0 = dim0[:, 1]
+        dim1 = dim1[:, 1]
+        index = dim0 * self.square + dim1
+        policy = self.policy_embedding(index)
+        value = self.value_embedding(index)
 
         return policy, value
 
@@ -74,7 +77,9 @@ def main():
         state = grid.state()
         state = torch.tensor(state, dtype=torch.float32)
 
-        policy_logit, value = network(state)
+        policy_logit, value = network(state.unsqueeze(0))
+        policy_logit = policy_logit[0]
+        value = value[0]
         policy = torch.softmax(policy_logit, 0)
         action = torch.multinomial(policy, 1).item()
 
@@ -89,8 +94,8 @@ def main():
 
         next_state = grid.state()
         next_state = torch.tensor(next_state, dtype=torch.float32)
-        _, next_value = network(next_state)
-        td = reward + kGamma * next_value.item() - value
+        _, next_value = network(next_state.unsqueeze(0))
+        td = reward + kGamma * next_value[0].item() - value
         value_loss = td * td
 
         log_prob = torch.log_softmax(policy_logit, 0)[action]
