@@ -76,4 +76,5 @@ bool GridWorld::is_ideal_action(const Action action) const
       return (dx < 0);
     }
   }
+  return false;
 }
