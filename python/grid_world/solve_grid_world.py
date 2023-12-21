@@ -67,7 +67,7 @@ def main():
 
     optimizer = optim.SGD(network.parameters(), 1.0)
 
-    buffer = ReplayBuffer(2)
+    buffer = ReplayBuffer(200)
 
     kGamma = 0.9  # 割引率
 
@@ -77,7 +77,7 @@ def main():
 
     f = open("grid_world_log.tsv", "w")
 
-    for i in range(20000):
+    for i in range(30000):
         print("")
         # 実行フェーズ
         network.eval()
@@ -108,7 +108,7 @@ def main():
 
         # 学習フェーズ
         network.train()
-        samples = buffer.sample(4)
+        samples = buffer.sample(1)
         if samples is None:
             continue
 

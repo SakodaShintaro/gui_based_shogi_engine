@@ -14,7 +14,7 @@ class ReplayBuffer:
         self.buffer_.append(Experience(state, action, reward, value))
 
     def sample(self, batch_size):
-        if len(self.buffer_) < self.seq_len_:
+        if len(self.buffer_) < self.buffer_.maxlen:
             return None
 
         max_index = len(self.buffer_) - self.seq_len_ + 1
