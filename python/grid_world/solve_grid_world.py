@@ -100,7 +100,7 @@ def main():
             ideal_action_num -= is_ideal_actions.popleft()
 
         success = grid.step(action)
-        reward = 1.0 if success else -0.1
+        reward = 1.0 if success else -0.01
 
         buffer.push(state, action, reward, value.item())
         ideal_rate = 100.0 * ideal_action_num / kWindowSize
@@ -148,7 +148,7 @@ def main():
         after_policies = torch.softmax(after_policies, 1)
         for j in range(len(samples)):
             print(f"学習局面{j} : ", end="")
-            print(f"reward = {samples[j][0].reward:+.1f}", end=", ")
+            print(f"reward = {samples[j][0].reward:+.2f}", end=", ")
             print(f"value_target = {value_targets[j].item():+.4f}", end=", ")
             print(f"value = {train_values[j].item():+.4f}", end=", ")
             print(f"td = {td[j].item():+.4f}")
