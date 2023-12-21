@@ -141,6 +141,7 @@ def main():
 
         optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(network.parameters(), max_norm=1.0)
         optimizer.step()
 
         after_policies, _ = network(states)
