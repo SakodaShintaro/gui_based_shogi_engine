@@ -143,6 +143,31 @@ def main():
         loss.backward()
         optimizer.step()
 
+        after_policies, _ = network(states)
+        train_policies = torch.softmax(train_policies, 1)
+        after_policies = torch.softmax(after_policies, 1)
+        for j in range(len(samples)):
+            print(f"学習局面{j} : ", end="")
+            print(f"reward = {samples[j][0].reward:+.1f}", end=", ")
+            print(f"value_target = {value_targets[j].item():+.4f}", end=", ")
+            print(f"value = {train_values[j].item():+.4f}", end=", ")
+            print(f"td = {td[j].item():+.4f}")
+            for h in range(kGridSize):
+                for w in range(kGridSize):
+                    v = 0
+                    if samples[j][0].state[0][h][w] == 1:
+                        v += 1
+                    if samples[j][0].state[1][h][w] == 1:
+                        v += 2
+                    print(v, end="")
+                print()
+
+            for k in range(kActionSize):
+                diff = after_policies[j][k] - train_policies[j][k]
+                end = " <- curr_action\n" if k == actions[j] else "\n"
+                print(
+                    f"{train_policies[j][k]:+.4f} -> {after_policies[j][k]:+.4f} = {diff:+.4f}", end=end)
+
         f.write(
             f"{i}\t{value_loss.item():.4f}\t{policy_loss.item():.4f}\t{success}\t{is_ideal_action}\n")
 
