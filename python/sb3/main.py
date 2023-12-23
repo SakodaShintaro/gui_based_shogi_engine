@@ -6,7 +6,7 @@ env = CustomEnv(4)
 vec_env = make_vec_env(CustomEnv, n_envs=1, env_kwargs=dict(grid_size=4))
 model = A2C("CnnPolicy", env, verbose=0)
 
-for epoch in range(50):
+for epoch in range(100):
     # Train
     model = model.learn(1000)
 
@@ -23,4 +23,5 @@ for epoch in range(50):
         # vec_env.render()
         ideal_num += is_ideal_action
 
-    print(f"epoch={epoch}, ideal_rate={100 * ideal_num / n_steps:.1f}")
+    ideal_rate = 100 * ideal_num / n_steps
+    print(f"epoch={epoch:3d}, ideal_rate={ideal_rate:.1f}")
