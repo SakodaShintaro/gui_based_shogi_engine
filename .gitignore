@@ -2,3 +2,4 @@ build-Debug/
 build-Release/
 *.tsv
 *.pyc
+events.*
