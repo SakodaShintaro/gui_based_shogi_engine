@@ -6,12 +6,12 @@ import time
 
 
 class CustomCallback(BaseCallback):
-    def __init__(self):
+    def __init__(self, method_name):
         super().__init__()
         self.start_time = time.time()
         self.vec_env = make_vec_env(
             CustomEnv, n_envs=1, env_kwargs=dict(grid_size=4))
-        self.writer = SummaryWriter()
+        self.writer = SummaryWriter(f"runs/{method_name}-{self.start_time}")
 
     def _on_step(self) -> bool:
         # Test
