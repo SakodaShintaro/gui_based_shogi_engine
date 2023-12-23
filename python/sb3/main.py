@@ -3,25 +3,24 @@ from stable_baselines3.common.env_util import make_vec_env
 from env_grid_world import CustomEnv
 
 env = CustomEnv(4)
-
-# Instantiate the env
 vec_env = make_vec_env(CustomEnv, n_envs=1, env_kwargs=dict(grid_size=4))
+model = A2C("CnnPolicy", env, verbose=0)
 
-# Train the agent
-model = A2C("CnnPolicy", env, verbose=1).learn(5000)
+for epoch in range(50):
+    # Train
+    model = model.learn(1000)
 
-# Test the trained agent
-obs = vec_env.reset()
-n_steps = 20000
-for step in range(n_steps):
-    action, _ = model.predict(obs, deterministic=False)
-    print(f"Step {step + 1}")
-    print("Action: ", action)
-    obs, reward, done, info = vec_env.step(action)
-    print("reward=", reward, "done=", done)
-    vec_env.render()
-    if done:
-        # Note that the VecEnv resets automatically
-        # when a done signal is encountered
-        print("Goal reached!", "reward=", reward)
-        break
+    # Test
+    obs = vec_env.reset()
+    n_steps = 1000
+    ideal_num = 0
+    for step in range(n_steps):
+        action, _ = model.predict(obs, deterministic=False)
+        obs, reward, done, info = vec_env.step(action)
+        is_ideal_action = info[0].get('is_ideal_action')
+        # print(
+        #     f"step={step}, action={action}, reward={reward}, done={done}, is_ideal_action={is_ideal_action}")
+        # vec_env.render()
+        ideal_num += is_ideal_action
+
+    print(f"epoch={epoch}, ideal_rate={100 * ideal_num / n_steps:.1f}")

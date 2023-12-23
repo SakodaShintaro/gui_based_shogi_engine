@@ -15,8 +15,6 @@ class CustomEnv(gym.Env):
     metadata = {"render_modes": ["console", "human"], "render_fps": 30}
 
     def __init__(self, grid_size: int):
-        print("CustomEnv.__init__")
-        print(f"grid_size: {grid_size}")
         super().__init__()
         self.render_mode = "human"
         minimal_resolution = 36
@@ -45,6 +43,7 @@ class CustomEnv(gym.Env):
     def step(self, action):
         reward = -0.01
         terminated = False
+        info = {"is_ideal_action": self._is_ideal_action(action)}
         if action == kUp:
             self.position_self_y -= 1
         elif action == kRight:
@@ -64,7 +63,6 @@ class CustomEnv(gym.Env):
         self.position_self_y = min(
             max(self.position_self_y, 0), self.grid_size - 1)
         truncated = False
-        info = {}
         return self._make_observation(), reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
@@ -94,6 +92,22 @@ class CustomEnv(gym.Env):
 
     def close(self):
         pass
+
+    def _is_ideal_action(self, action):
+        if self.position_self_x == self.position_goal_x and self.position_self_y == self.position_goal_y:
+            return action == kClick
+        else:
+            dx = self.position_goal_x - self.position_self_x
+            dy = self.position_goal_y - self.position_self_y
+            if action == kUp:
+                return dy < 0
+            elif action == kRight:
+                return dx > 0
+            elif action == kDown:
+                return dy > 0
+            elif action == kLeft:
+                return dx < 0
+        return False
 
 
 if __name__ == "__main__":
