@@ -10,6 +10,6 @@ for trial in range(10):
         method_name = (method.__name__)[0:3]
         print(f"method={method_name}")
         event_callback = EveryNTimesteps(
-            n_steps=8000, callback=CustomCallback(f"{method_name}_trial{trial}"))
-        model = method("CnnPolicy", env, verbose=0).learn(
+            n_steps=8000, callback=CustomCallback())
+        model = method("CnnPolicy", env, verbose=0, tensorboard_log="./runs").learn(
             400000, callback=event_callback)

@@ -1,17 +1,15 @@
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.env_util import make_vec_env
-from tensorboardX import SummaryWriter
 from env_grid_world import CustomEnv
 import time
 
 
 class CustomCallback(BaseCallback):
-    def __init__(self, method_name):
+    def __init__(self):
         super().__init__()
         self.start_time = time.time()
         self.vec_env = make_vec_env(
             CustomEnv, n_envs=1, env_kwargs=dict(grid_size=4))
-        self.writer = SummaryWriter(f"runs/{method_name}-{self.start_time}")
 
     def _on_step(self) -> bool:
         # Test
@@ -34,6 +32,5 @@ class CustomCallback(BaseCallback):
         progress = 100 * self.num_timesteps / total
         print(
             f"{elapsed_str}  num_timesteps={self.num_timesteps:7d}({progress:5.1f}%), ideal_rate={ideal_rate:5.1f}")
-        self.writer.add_scalar("ideal_rate", ideal_rate, self.num_timesteps)
-        self.writer.flush()
+        self.model.logger.record("ideal_rate", ideal_rate, self.num_timesteps)
         return True
