@@ -40,14 +40,14 @@ class QNetwork(BasePolicy):
         self.features_dim = features_dim
         action_dim = int(self.action_space.n)  # number of actions
 
-        # q_net = create_mlp(self.features_dim, action_dim, self.net_arch, self.activation_fn)
-        # self.q_net = nn.Sequential(*q_net)
+        q_net = create_mlp(self.features_dim, action_dim, self.net_arch, self.activation_fn)
+        self.q_net = nn.Sequential(*q_net)
 
-        transformer_layer = nn.TransformerEncoderLayer(
-            self.features_dim, 8, dim_feedforward=64, dropout=0.0, norm_first=True)
-        layers = nn.TransformerEncoder(transformer_layer, 1)
-        liner = nn.Linear(self.features_dim, action_dim)
-        self.q_net = nn.Sequential(layers, liner)
+        # transformer_layer = nn.TransformerEncoderLayer(
+        #     self.features_dim, 8, dim_feedforward=64, dropout=0.0, norm_first=True)
+        # layers = nn.TransformerEncoder(transformer_layer, 1)
+        # liner = nn.Linear(self.features_dim, action_dim)
+        # self.q_net = nn.Sequential(layers, liner)
 
         # linear1 = nn.Linear(self.features_dim, 64)
         # linear2 = nn.Linear(64, 64)
