@@ -15,48 +15,9 @@ from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
 
 import random
-from typing import Callable
 
 from env_grid_world import CustomEnv
-
-
-def evaluate(
-    model_path: str,
-    make_env: Callable,
-    env_id: str,
-    eval_episodes: int,
-    run_name: str,
-    Model: torch.nn.Module,
-    device: torch.device = torch.device("cpu"),
-    epsilon: float = 0.05,
-    capture_video: bool = True,
-):
-    envs = gym.vector.SyncVectorEnv(
-        [make_env(env_id, 0, 0, capture_video, run_name)])
-    model = Model(envs).to(device)
-    model.load_state_dict(torch.load(model_path, map_location=device))
-    model.eval()
-
-    obs, _ = envs.reset()
-    episodic_returns = []
-    while len(episodic_returns) < eval_episodes:
-        if random.random() < epsilon:
-            actions = np.array([envs.single_action_space.sample()
-                               for _ in range(envs.num_envs)])
-        else:
-            q_values = model(torch.Tensor(obs).to(device))
-            actions = torch.argmax(q_values, dim=1).cpu().numpy()
-        next_obs, _, _, _, infos = envs.step(actions)
-        if "final_info" in infos:
-            for info in infos["final_info"]:
-                if "episode" not in info:
-                    continue
-                print(
-                    f"eval_episode={len(episodic_returns)}, episodic_return={info['episode']['r']}")
-                episodic_returns += [info["episode"]["r"]]
-        obs = next_obs
-
-    return episodic_returns
+from evaluate import evaluate
 
 
 @dataclass
@@ -77,8 +38,6 @@ class Args:
     """the user or org name of the model repository from the Hugging Face Hub"""
 
     # Algorithm specific arguments
-    env_id: str = "CartPole-v1"
-    """the id of the environment"""
     total_timesteps: int = 500000
     """total timesteps of the experiments"""
     learning_rate: float = 2.5e-4
@@ -107,7 +66,7 @@ class Args:
     """the frequency of training"""
 
 
-def make_env(env_id, seed, idx, capture_video, run_name):
+def make_env(seed, idx, capture_video, run_name):
     def thunk():
         env = CustomEnv(4)
         env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -158,7 +117,7 @@ if __name__ == "__main__":
         )
     args = tyro.cli(Args)
     assert args.num_envs == 1, "vectorized envs are not supported at the moment"
-    run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
+    run_name = f"{args.exp_name}__{args.seed}__{int(time.time())}"
     writer = SummaryWriter(f"runs/{run_name}")
     writer.add_text(
         "hyperparameters",
@@ -177,7 +136,7 @@ if __name__ == "__main__":
 
     # env setup
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.env_id, args.seed + i, i, args.capture_video, run_name)
+        [make_env(args.seed + i, i, args.capture_video, run_name)
          for i in range(args.num_envs)]
     )
     assert isinstance(envs.single_action_space,
@@ -276,7 +235,6 @@ if __name__ == "__main__":
         episodic_returns = evaluate(
             model_path,
             make_env,
-            args.env_id,
             eval_episodes=10,
             run_name=f"{run_name}-eval",
             Model=QNetwork,
