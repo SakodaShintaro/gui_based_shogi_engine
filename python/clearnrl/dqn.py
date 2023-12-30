@@ -16,7 +16,6 @@ from torch.utils.tensorboard import SummaryWriter
 import random
 
 from env_grid_world import CustomEnv
-from evaluate import evaluate
 from custom_replay_buffer import CustomBuffer
 
 @dataclass
