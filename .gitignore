@@ -3,3 +3,4 @@ build-Release/
 *.tsv
 *.pyc
 events.*
+*.model
