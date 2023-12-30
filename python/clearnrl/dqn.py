@@ -167,15 +167,6 @@ if __name__ == "__main__":
             ideal_action_num = 0
             total_action_num = 0
 
-        # TRY NOT TO MODIFY: record rewards for plotting purposes
-        if "final_info" in info:
-            for info in info["final_info"]:
-                if info and "episode" in info:
-                    writer.add_scalar("charts/episodic_return",
-                                      info["episode"]["r"], global_step)
-                    writer.add_scalar("charts/episodic_length",
-                                      info["episode"]["l"], global_step)
-
         # TRY NOT TO MODIFY: save data to reply buffer; handle `final_observation`
         real_next_obs = next_obs.copy()
         if truncation:
