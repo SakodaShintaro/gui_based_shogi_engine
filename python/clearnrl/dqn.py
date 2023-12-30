@@ -26,12 +26,6 @@ class Args:
     """the name of this experiment"""
     seed: int = 1
     """seed of the experiment"""
-    torch_deterministic: bool = True
-    """if toggled, `torch.backends.cudnn.deterministic=False`"""
-    cuda: bool = True
-    """if toggled, cuda will be enabled by default"""
-    save_model: bool = False
-    """whether to save model into the `runs/{run_name}` folder"""
 
     # Algorithm specific arguments
     total_timesteps: int = 100000
@@ -125,10 +119,9 @@ if __name__ == "__main__":
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    torch.backends.cudnn.deterministic = args.torch_deterministic
+    torch.backends.cudnn.deterministic = True
 
-    device = torch.device(
-        "cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+    device = torch.device("cuda")
 
     # env setup
     envs = gym.vector.SyncVectorEnv(
@@ -232,16 +225,6 @@ if __name__ == "__main__":
                 print(f"global_step={global_step}, ideal_rate={ideal_rate}")
                 writer.add_scalar("eval/ideal_rate", ideal_rate, global_step)
 
-    if args.save_model:
-        torch.save(q_network.state_dict(), model_path)
-        episodic_returns = evaluate(
-            model_path,
-            make_env,
-            Model=QNetwork,
-            device=device,
-        )
-        for idx, episodic_return in enumerate(episodic_returns):
-            writer.add_scalar("eval/episodic_return", episodic_return, idx)
-
+    torch.save(q_network.state_dict(), model_path)
     envs.close()
     writer.close()
