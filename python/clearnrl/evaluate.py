@@ -15,29 +15,25 @@ def evaluate(
     epsilon: float = 0.05,
     capture_video: bool = True,
 ):
-    envs = gym.vector.SyncVectorEnv(
-        [make_env(0, 0, capture_video, run_name)])
-    model = Model(envs).to(device)
+    env = make_env(0, 0, capture_video, run_name)()
+    model = Model(2, 5).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
-    obs, _ = envs.reset()
-    episodic_returns = []
-    while len(episodic_returns) < eval_episodes:
+    obs, _ = env.reset()
+    n_steps = 1000
+    ideal_num = 0
+    for _ in range(n_steps):
         if random.random() < epsilon:
-            actions = np.array([envs.single_action_space.sample()
-                               for _ in range(envs.num_envs)])
+            action = env.action_space.sample()
         else:
-            q_values = model(torch.Tensor(obs).to(device))
-            actions = torch.argmax(q_values, dim=1).cpu().numpy()
-        next_obs, _, _, _, infos = envs.step(actions)
-        if "final_info" in infos:
-            for info in infos["final_info"]:
-                if "episode" not in info:
-                    continue
-                print(
-                    f"eval_episode={len(episodic_returns)}, episodic_return={info['episode']['r']}")
-                episodic_returns += [info["episode"]["r"]]
+            q_values = model(torch.Tensor(obs).to(device).unsqueeze(0))
+            action = torch.argmax(q_values, dim=1).cpu().numpy()
+        next_obs, reward, terminated, truncated, infos = env.step(action)
+        is_ideal_action = int(infos.get("is_ideal_action"))
+        ideal_num += is_ideal_action
         obs = next_obs
 
-    return episodic_returns
+    ideal_rate = 100 * ideal_num / n_steps
+
+    return ideal_rate

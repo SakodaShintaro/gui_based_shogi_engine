@@ -38,7 +38,7 @@ class Args:
     """the user or org name of the model repository from the Hugging Face Hub"""
 
     # Algorithm specific arguments
-    total_timesteps: int = 500000
+    total_timesteps: int = 200000
     """total timesteps of the experiments"""
     learning_rate: float = 2.5e-4
     """the learning rate of the optimizer"""
@@ -64,6 +64,7 @@ class Args:
     """timestep to start learning"""
     train_frequency: int = 10
     """the frequency of training"""
+    eval_frequency: int = 8000
 
 
 def make_env(seed, idx, capture_video, run_name):
@@ -77,10 +78,10 @@ def make_env(seed, idx, capture_video, run_name):
 
 # ALGO LOGIC: initialize agent here:
 class QNetwork(nn.Module):
-    def __init__(self, env):
+    def __init__(self, in_channels, out_channels):
         super().__init__()
         self.network = nn.Sequential(
-            nn.Conv2d(2, 32, kernel_size=8, stride=4, padding=0),
+            nn.Conv2d(in_channels, 32, kernel_size=8, stride=4, padding=0),
             nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=0),
             nn.ReLU(),
@@ -93,7 +94,7 @@ class QNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(64, 64),
             nn.ReLU(),
-            nn.Linear(64, env.single_action_space.n),
+            nn.Linear(64, out_channels),
         )
 
     def forward(self, x):
@@ -125,6 +126,8 @@ if __name__ == "__main__":
             "\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
     )
 
+    model_path = f"runs/{run_name}/{args.exp_name}.model"
+
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -142,9 +145,9 @@ if __name__ == "__main__":
     assert isinstance(envs.single_action_space,
                       gym.spaces.Discrete), "only discrete action space is supported"
 
-    q_network = QNetwork(envs).to(device)
+    q_network = QNetwork(2, 5).to(device)
     optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
-    target_network = QNetwork(envs).to(device)
+    target_network = QNetwork(2, 5).to(device)
     target_network.load_state_dict(q_network.state_dict())
 
     rb = ReplayBuffer(
@@ -177,8 +180,8 @@ if __name__ == "__main__":
         if "final_info" in infos:
             for info in infos["final_info"]:
                 if info and "episode" in info:
-                    print(
-                        f"global_step={global_step}, episodic_return={info['episode']['r']}")
+                    # print(
+                    #     f"global_step={global_step}, episodic_return={info['episode']['r']}")
                     writer.add_scalar("charts/episodic_return",
                                       info["episode"]["r"], global_step)
                     writer.add_scalar("charts/episodic_length",
@@ -211,7 +214,6 @@ if __name__ == "__main__":
                     writer.add_scalar("losses/td_loss", loss, global_step)
                     writer.add_scalar("losses/q_values",
                                       old_val.mean().item(), global_step)
-                    print("SPS:", int(global_step / (time.time() - start_time)))
                     writer.add_scalar(
                         "charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
@@ -228,10 +230,22 @@ if __name__ == "__main__":
                         (1.0 - args.tau) * target_network_param.data
                     )
 
+            if global_step % args.eval_frequency == 0:
+                torch.save(q_network.state_dict(), model_path)
+                ideal_rate = evaluate(
+                    model_path,
+                    make_env,
+                    eval_episodes=10,
+                    run_name=f"{run_name}-eval",
+                    Model=QNetwork,
+                    device=device,
+                    epsilon=0.05,
+                )
+                print(f"global_step={global_step}, ideal_rate={ideal_rate}")
+                writer.add_scalar("eval/ideal_rate", ideal_rate, global_step)
+
     if args.save_model:
-        model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
         torch.save(q_network.state_dict(), model_path)
-        print(f"model saved to {model_path}")
         episodic_returns = evaluate(
             model_path,
             make_env,
