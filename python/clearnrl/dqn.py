@@ -39,12 +39,6 @@ class Args:
     train_frequency: int = 10
 
 
-def make_env():
-    env = CustomEnv(4)
-    env = gym.wrappers.RecordEpisodeStatistics(env)
-    return env
-
-
 # ALGO LOGIC: initialize agent here:
 class QNetwork(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -97,7 +91,8 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     # env setup
-    env = make_env()
+    env = CustomEnv(4)
+    env = gym.wrappers.RecordEpisodeStatistics(env)
     print(env.observation_space, env.action_space)
     in_channels = env.observation_space.shape[0]
     out_channels = env.action_space.n
@@ -121,10 +116,11 @@ if __name__ == "__main__":
     ideal_action_num = 0
     total_action_num = 0
     print_interval = args.total_timesteps // 20
+    exploration_step = args.exploration_fraction * args.total_timesteps
     for global_step in range(1, args.total_timesteps + 1):
         # ALGO LOGIC: put action logic here
         epsilon = linear_schedule(
-            args.start_epsilon, args.end_epsilon, args.exploration_fraction * args.total_timesteps, global_step)
+            args.start_epsilon, args.end_epsilon, exploration_step, global_step)
         if random.random() < epsilon:
             actions = env.action_space.sample()
         else:
