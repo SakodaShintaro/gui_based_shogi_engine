@@ -11,14 +11,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tyro
-from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
 
 import random
 
 from env_grid_world import CustomEnv
 from evaluate import evaluate
-
+from custom_replay_buffer import CustomBuffer
 
 @dataclass
 class Args:
@@ -135,7 +134,7 @@ if __name__ == "__main__":
     target_network = QNetwork(2, 5).to(device)
     target_network.load_state_dict(q_network.state_dict())
 
-    rb = ReplayBuffer(
+    rb = CustomBuffer(
         args.buffer_size,
         envs.single_observation_space,
         envs.single_action_space,
