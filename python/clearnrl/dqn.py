@@ -34,7 +34,7 @@ class Args:
     """whether to save model into the `runs/{run_name}` folder"""
 
     # Algorithm specific arguments
-    total_timesteps: int = 200000
+    total_timesteps: int = 100000
     """total timesteps of the experiments"""
     learning_rate: float = 2.5e-4
     """the learning rate of the optimizer"""
@@ -60,7 +60,7 @@ class Args:
     """timestep to start learning"""
     train_frequency: int = 10
     """the frequency of training"""
-    eval_frequency: int = 8000
+    eval_frequency: int = 5000
 
 
 def make_env():
@@ -172,8 +172,6 @@ if __name__ == "__main__":
         if "final_info" in infos:
             for info in infos["final_info"]:
                 if info and "episode" in info:
-                    # print(
-                    #     f"global_step={global_step}, episodic_return={info['episode']['r']}")
                     writer.add_scalar("charts/episodic_return",
                                       info["episode"]["r"], global_step)
                     writer.add_scalar("charts/episodic_length",
