@@ -15,7 +15,7 @@ def evaluate(
     epsilon: float = 0.05,
     capture_video: bool = True,
 ):
-    env = make_env(0, 0, capture_video, run_name)()
+    env = make_env()
     model = Model(2, 5).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()

@@ -67,13 +67,10 @@ class Args:
     eval_frequency: int = 8000
 
 
-def make_env(seed, idx, capture_video, run_name):
-    def thunk():
-        env = CustomEnv(4)
-        env = gym.wrappers.RecordEpisodeStatistics(env)
-        return env
-
-    return thunk
+def make_env():
+    env = CustomEnv(4)
+    env = gym.wrappers.RecordEpisodeStatistics(env)
+    return env
 
 
 # ALGO LOGIC: initialize agent here:
@@ -139,8 +136,7 @@ if __name__ == "__main__":
 
     # env setup
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.seed + i, i, args.capture_video, run_name)
-         for i in range(args.num_envs)]
+        [make_env for _ in range(args.num_envs)]
     )
     assert isinstance(envs.single_action_space,
                       gym.spaces.Discrete), "only discrete action space is supported"
