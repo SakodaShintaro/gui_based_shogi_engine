@@ -1,19 +1,11 @@
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Generator, List, Optional, Tuple, Union
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union, NamedTuple
 
 import numpy as np
 import torch as th
 from gymnasium import spaces
 
-from stable_baselines3.common.preprocessing import get_action_dim, get_obs_shape
-from stable_baselines3.common.type_aliases import (
-    DictReplayBufferSamples,
-    DictRolloutBufferSamples,
-    ReplayBufferSamples,
-    RolloutBufferSamples,
-)
-from stable_baselines3.common.utils import get_device
 from stable_baselines3.common.vec_env import VecNormalize
 
 try:
@@ -23,6 +15,22 @@ except ImportError:
     psutil = None
 
 from stable_baselines3.common.buffers import BaseBuffer
+
+
+class CustomBufferSamples(NamedTuple):
+    """
+    通常のReplayBufferから変更
+    obs (bs, C, H, W) -> (bs, T, C, H, W)
+    act (bs, 1) -> (bs, T, 1)
+    nxt (bs, C, H, W) -> 削除(obsのTターン目)
+    don (bs, 1) -> (bs, T, 1)
+    rew (bs, 1) -> (bs, T, 1)
+    """
+    observations: th.Tensor
+    actions: th.Tensor
+    next_observations: th.Tensor
+    dones: th.Tensor
+    rewards: th.Tensor
 
 
 class CustomBuffer(BaseBuffer):
@@ -161,7 +169,7 @@ class CustomBuffer(BaseBuffer):
             self.full = True
             self.pos = 0
 
-    def sample(self, batch_size: int, env: Optional[VecNormalize] = None) -> ReplayBufferSamples:
+    def sample(self, batch_size: int, env: Optional[VecNormalize] = None) -> CustomBufferSamples:
         """
         Sample elements from the replay buffer.
         Custom sampling when using memory efficient variant,
@@ -184,7 +192,7 @@ class CustomBuffer(BaseBuffer):
             batch_inds = np.random.randint(0, self.pos, size=batch_size)
         return self._get_samples(batch_inds, env=env)
 
-    def _get_samples(self, batch_inds: np.ndarray, env: Optional[VecNormalize] = None) -> ReplayBufferSamples:
+    def _get_samples(self, batch_inds: np.ndarray, env: Optional[VecNormalize] = None) -> CustomBufferSamples:
         # Sample randomly the env idx
         env_indices = np.random.randint(
             0, high=self.n_envs, size=(len(batch_inds),))
@@ -208,7 +216,7 @@ class CustomBuffer(BaseBuffer):
             self._normalize_reward(
                 self.rewards[batch_inds, env_indices].reshape(-1, 1), env),
         )
-        return ReplayBufferSamples(*tuple(map(self.to_torch, data)))
+        return CustomBufferSamples(*tuple(map(self.to_torch, data)))
 
     @staticmethod
     def _maybe_cast_dtype(dtype: np.typing.DTypeLike) -> np.typing.DTypeLike:
