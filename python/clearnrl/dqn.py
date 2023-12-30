@@ -17,9 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 import random
 from typing import Callable
 
-import gymnasium as gym
-import numpy as np
-import torch
+from env_grid_world import CustomEnv
 
 
 def evaluate(
@@ -111,14 +109,8 @@ class Args:
 
 def make_env(env_id, seed, idx, capture_video, run_name):
     def thunk():
-        if capture_video and idx == 0:
-            env = gym.make(env_id, render_mode="rgb_array")
-            env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
-        else:
-            env = gym.make(env_id)
+        env = CustomEnv(4)
         env = gym.wrappers.RecordEpisodeStatistics(env)
-        env.action_space.seed(seed)
-
         return env
 
     return thunk
@@ -129,15 +121,25 @@ class QNetwork(nn.Module):
     def __init__(self, env):
         super().__init__()
         self.network = nn.Sequential(
-            nn.Linear(np.array(env.single_observation_space.shape).prod(), 120),
+            nn.Conv2d(2, 32, kernel_size=8, stride=4, padding=0),
             nn.ReLU(),
-            nn.Linear(120, 84),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=0),
             nn.ReLU(),
-            nn.Linear(84, env.single_action_space.n),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=0),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(64, 512),
+            nn.ReLU(),
+            nn.Linear(512, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, env.single_action_space.n),
         )
 
     def forward(self, x):
-        return self.network(x)
+        x = self.network(x)
+        return x
 
 
 def linear_schedule(start_e: float, end_e: float, duration: int, t: int):
