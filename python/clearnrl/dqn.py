@@ -18,38 +18,25 @@ import random
 from env_grid_world import CustomEnv
 from custom_replay_buffer import CustomBuffer
 
+
 @dataclass
 class Args:
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
-    """the name of this experiment"""
     seed: int = 1
-    """seed of the experiment"""
 
     # Algorithm specific arguments
     total_timesteps: int = 100000
-    """total timesteps of the experiments"""
     learning_rate: float = 2.5e-4
-    """the learning rate of the optimizer"""
     buffer_size: int = 10000
-    """the replay memory buffer size"""
-    gamma: float = 0.99
-    """the discount factor gamma"""
-    tau: float = 1.0
-    """the target network update rate"""
+    discount_factor: float = 0.99
+    tau: float = 1.0  # the target network update rate
     target_network_frequency: int = 500
-    """the timesteps it takes to update the target network"""
     batch_size: int = 128
-    """the batch size of sample from the reply memory"""
-    start_e: float = 1
-    """the starting epsilon for exploration"""
-    end_e: float = 0.05
-    """the ending epsilon for exploration"""
+    start_epsilon: float = 1
+    end_epsilon: float = 0.05
     exploration_fraction: float = 0.5
-    """the fraction of `total-timesteps` it takes from start-e to go end-e"""
     learning_starts: int = 10000
-    """timestep to start learning"""
     train_frequency: int = 10
-    """the frequency of training"""
 
 
 def make_env():
@@ -137,7 +124,7 @@ if __name__ == "__main__":
     for global_step in range(1, args.total_timesteps + 1):
         # ALGO LOGIC: put action logic here
         epsilon = linear_schedule(
-            args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
+            args.start_epsilon, args.end_epsilon, args.exploration_fraction * args.total_timesteps, global_step)
         if random.random() < epsilon:
             actions = env.action_space.sample()
         else:
@@ -154,8 +141,10 @@ if __name__ == "__main__":
         total_action_num += 1
         ideal_action_rate = 100 * ideal_action_num / total_action_num
         if global_step % print_interval == 0:
-            print(f"global_step: {global_step:07d}, ideal_action_rate: {ideal_action_rate:05.1f}%")
-            writer.add_scalar("eval/ideal_rate", ideal_action_rate, global_step)
+            print(
+                f"global_step: {global_step:07d}, ideal_action_rate: {ideal_action_rate:05.1f}%")
+            writer.add_scalar("eval/ideal_rate",
+                              ideal_action_rate, global_step)
             ideal_action_num = 0
             total_action_num = 0
 
@@ -175,7 +164,7 @@ if __name__ == "__main__":
                 with torch.no_grad():
                     target_max, _ = target_network(
                         data.next_observations).max(dim=1)
-                    td_target = data.rewards.flatten() + args.gamma * target_max * \
+                    td_target = data.rewards.flatten() + args.discount_factor * target_max * \
                         (1 - data.dones.flatten())
                 old_val = q_network(data.observations).gather(
                     1, data.actions).squeeze()
