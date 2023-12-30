@@ -8,12 +8,9 @@ import random
 def evaluate(
     model_path: str,
     make_env: Callable,
-    eval_episodes: int,
-    run_name: str,
     Model: torch.nn.Module,
     device: torch.device = torch.device("cpu"),
     epsilon: float = 0.05,
-    capture_video: bool = True,
 ):
     env = make_env()
     model = Model(2, 5).to(device)

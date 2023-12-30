@@ -153,7 +153,7 @@ if __name__ == "__main__":
 
     # TRY NOT TO MODIFY: start the game
     obs, _ = envs.reset(seed=args.seed)
-    for global_step in range(args.total_timesteps):
+    for global_step in range(1, args.total_timesteps + 1):
         # ALGO LOGIC: put action logic here
         epsilon = linear_schedule(
             args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
@@ -227,8 +227,6 @@ if __name__ == "__main__":
                 ideal_rate = evaluate(
                     model_path,
                     make_env,
-                    eval_episodes=10,
-                    run_name=f"{run_name}-eval",
                     Model=QNetwork,
                     device=device,
                     epsilon=0.05,
@@ -241,11 +239,8 @@ if __name__ == "__main__":
         episodic_returns = evaluate(
             model_path,
             make_env,
-            eval_episodes=10,
-            run_name=f"{run_name}-eval",
             Model=QNetwork,
             device=device,
-            epsilon=0.05,
         )
         for idx, episodic_return in enumerate(episodic_returns):
             writer.add_scalar("eval/episodic_return", episodic_return, idx)
