@@ -51,7 +51,6 @@ class Args:
     """timestep to start learning"""
     train_frequency: int = 10
     """the frequency of training"""
-    eval_frequency: int = 5000
 
 
 def make_env():
@@ -141,7 +140,9 @@ if __name__ == "__main__":
 
     # TRY NOT TO MODIFY: start the game
     obs, _ = env.reset(seed=args.seed)
-    ideal_rate = 0
+    ideal_action_num = 0
+    total_action_num = 0
+    print_interval = args.total_timesteps // 20
     for global_step in range(1, args.total_timesteps + 1):
         # ALGO LOGIC: put action logic here
         epsilon = linear_schedule(
@@ -158,6 +159,14 @@ if __name__ == "__main__":
             actions)
 
         is_ideal_action = info["is_ideal_action"]
+        ideal_action_num += int(is_ideal_action)
+        total_action_num += 1
+        ideal_action_rate = 100 * ideal_action_num / total_action_num
+        if global_step % print_interval == 0:
+            print(f"global_step: {global_step:07d}, ideal_action_rate: {ideal_action_rate:05.1f}%")
+            writer.add_scalar("eval/ideal_rate", ideal_action_rate, global_step)
+            ideal_action_num = 0
+            total_action_num = 0
 
         # TRY NOT TO MODIFY: record rewards for plotting purposes
         if "final_info" in info:
@@ -209,18 +218,6 @@ if __name__ == "__main__":
                         args.tau * q_network_param.data +
                         (1.0 - args.tau) * target_network_param.data
                     )
-
-            if global_step % args.eval_frequency == 0:
-                torch.save(q_network.state_dict(), model_path)
-                ideal_rate = evaluate(
-                    model_path,
-                    make_env,
-                    Model=QNetwork,
-                    device=device,
-                    epsilon=0.05,
-                )
-                print(f"global_step={global_step}, ideal_rate={ideal_rate}")
-                writer.add_scalar("eval/ideal_rate", ideal_rate, global_step)
 
     torch.save(q_network.state_dict(), model_path)
     env.close()
