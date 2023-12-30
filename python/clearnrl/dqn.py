@@ -31,8 +31,6 @@ class Args:
     """total timesteps of the experiments"""
     learning_rate: float = 2.5e-4
     """the learning rate of the optimizer"""
-    num_envs: int = 1
-    """the number of parallel game environments"""
     buffer_size: int = 10000
     """the replay memory buffer size"""
     gamma: float = 0.99
@@ -103,7 +101,6 @@ if __name__ == "__main__":
             """
         )
     args = tyro.cli(Args)
-    assert args.num_envs == 1, "vectorized envs are not supported at the moment"
     run_name = f"{args.exp_name}__{args.seed}__{int(time.time())}"
     writer = SummaryWriter(f"runs/{run_name}")
     writer.add_text(
@@ -123,46 +120,48 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     # env setup
-    envs = gym.vector.SyncVectorEnv(
-        [make_env for _ in range(args.num_envs)]
-    )
-    assert isinstance(envs.single_action_space,
-                      gym.spaces.Discrete), "only discrete action space is supported"
+    env = make_env()
+    print(env.observation_space, env.action_space)
+    in_channels = env.observation_space.shape[0]
+    out_channels = env.action_space.n
 
-    q_network = QNetwork(2, 5).to(device)
+    q_network = QNetwork(in_channels, out_channels).to(device)
     optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
-    target_network = QNetwork(2, 5).to(device)
+    target_network = QNetwork(in_channels, out_channels).to(device)
     target_network.load_state_dict(q_network.state_dict())
 
     rb = CustomBuffer(
         args.buffer_size,
-        envs.single_observation_space,
-        envs.single_action_space,
+        env.observation_space,
+        env.action_space,
         device,
         handle_timeout_termination=False,
     )
     start_time = time.time()
 
     # TRY NOT TO MODIFY: start the game
-    obs, _ = envs.reset(seed=args.seed)
+    obs, _ = env.reset(seed=args.seed)
+    ideal_rate = 0
     for global_step in range(1, args.total_timesteps + 1):
         # ALGO LOGIC: put action logic here
         epsilon = linear_schedule(
             args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
         if random.random() < epsilon:
-            actions = np.array([envs.single_action_space.sample()
-                               for _ in range(envs.num_envs)])
+            actions = env.action_space.sample()
         else:
-            q_values = q_network(torch.Tensor(obs).to(device))
+            x = torch.Tensor(obs).to(device).unsqueeze(0)
+            q_values = q_network(x)
             actions = torch.argmax(q_values, dim=1).cpu().numpy()
 
         # TRY NOT TO MODIFY: execute the game and log data.
-        next_obs, rewards, terminations, truncations, infos = envs.step(
+        next_obs, reward, termination, truncation, info = env.step(
             actions)
 
+        is_ideal_action = info["is_ideal_action"]
+
         # TRY NOT TO MODIFY: record rewards for plotting purposes
-        if "final_info" in infos:
-            for info in infos["final_info"]:
+        if "final_info" in info:
+            for info in info["final_info"]:
                 if info and "episode" in info:
                     writer.add_scalar("charts/episodic_return",
                                       info["episode"]["r"], global_step)
@@ -171,10 +170,9 @@ if __name__ == "__main__":
 
         # TRY NOT TO MODIFY: save data to reply buffer; handle `final_observation`
         real_next_obs = next_obs.copy()
-        for idx, trunc in enumerate(truncations):
-            if trunc:
-                real_next_obs[idx] = infos["final_observation"][idx]
-        rb.add(obs, real_next_obs, actions, rewards, terminations, infos)
+        if truncation:
+            real_next_obs = info["final_observation"]
+        rb.add(obs, real_next_obs, actions, reward, termination, info)
 
         # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
         obs = next_obs
@@ -225,5 +223,5 @@ if __name__ == "__main__":
                 writer.add_scalar("eval/ideal_rate", ideal_rate, global_step)
 
     torch.save(q_network.state_dict(), model_path)
-    envs.close()
+    env.close()
     writer.close()
