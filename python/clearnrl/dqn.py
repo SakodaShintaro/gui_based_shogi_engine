@@ -90,14 +90,6 @@ def linear_schedule(start_e: float, end_e: float, duration: int, t: int):
 
 
 if __name__ == "__main__":
-    import stable_baselines3 as sb3
-
-    if sb3.__version__ < "2.0":
-        raise ValueError(
-            """Ongoing migration: run the following command to install the new dependencies:
-            poetry run pip install "stable_baselines3==2.0.0a1"
-            """
-        )
     args = tyro.cli(Args)
     run_name = f"{args.exp_name}__{args.seed}__{int(time.time())}"
     writer = SummaryWriter(f"runs/{run_name}")
