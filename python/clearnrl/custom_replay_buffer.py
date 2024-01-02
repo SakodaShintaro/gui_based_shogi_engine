@@ -57,6 +57,8 @@ class CustomBuffer(BaseBuffer):
     ):
         super().__init__(buffer_size, observation_space, action_space, device, n_envs=1)
 
+        self.seq_len = 20
+
         # Adjust buffer size
         self.buffer_size = max(buffer_size, 1)
 
@@ -138,24 +140,38 @@ class CustomBuffer(BaseBuffer):
         # Do not sample the element with index `self.pos` as the transitions is invalid
         # (we use only one array to store `obs` and `next_obs`)
         if self.full:
-            batch_inds = (np.random.randint(1, self.buffer_size,
+            batch_inds = (np.random.randint(1, self.buffer_size - self.seq_len,
                           size=batch_size) + self.pos) % self.buffer_size
         else:
-            batch_inds = np.random.randint(0, self.pos, size=batch_size)
+            batch_inds = np.random.randint(
+                0, self.pos - self.seq_len, size=batch_size)
         return self._get_samples(batch_inds)
 
     def _get_samples(self, batch_inds: np.ndarray) -> CustomBufferSamples:
-        next_obs = self._normalize_obs(
-            self.observations[(batch_inds + 1) % self.buffer_size, :])
-
-        data = (
-            self._normalize_obs(self.observations[batch_inds, :]),
-            self.actions[batch_inds, :],
-            next_obs,
-            self.dones[batch_inds].reshape(-1, 1),
-            self._normalize_reward(self.rewards[batch_inds].reshape(-1, 1)),
+        data_list = []
+        for _ in range(self.seq_len):
+            data = (
+                self._normalize_obs(self.observations[batch_inds, :]),
+                self.actions[batch_inds, :],
+                self._normalize_obs(
+                    self.observations[(batch_inds + 1) % self.buffer_size, :]),
+                self.dones[batch_inds].reshape(-1, 1),
+                self._normalize_reward(
+                    self.rewards[batch_inds].reshape(-1, 1)),
+            )
+            data_list.append(CustomBufferSamples(
+                *tuple(map(self.to_torch, data))))
+            batch_inds = (batch_inds + 1) % self.buffer_size
+        data = CustomBufferSamples(
+            *tuple(map(lambda x: th.stack(x, dim=1), zip(*data_list))))
+        data = CustomBufferSamples(
+            data.observations[:, -1],
+            data.actions[:, -1],
+            data.next_observations[:, -1],
+            data.dones[:, -1],
+            data.rewards[:, -1],
         )
-        return CustomBufferSamples(*tuple(map(self.to_torch, data)))
+        return data
 
     @staticmethod
     def _maybe_cast_dtype(dtype: np.typing.DTypeLike) -> np.typing.DTypeLike:
