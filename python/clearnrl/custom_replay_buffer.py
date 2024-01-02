@@ -123,7 +123,7 @@ class CustomBuffer(BaseBuffer):
             self.full = True
             self.pos = 0
 
-    def sample(self, batch_size: int, env: Optional[VecNormalize] = None) -> CustomBufferSamples:
+    def sample(self, batch_size: int) -> CustomBufferSamples:
         """
         Sample elements from the replay buffer.
         Custom sampling when using memory efficient variant,
@@ -142,19 +142,18 @@ class CustomBuffer(BaseBuffer):
                           size=batch_size) + self.pos) % self.buffer_size
         else:
             batch_inds = np.random.randint(0, self.pos, size=batch_size)
-        return self._get_samples(batch_inds, env=env)
+        return self._get_samples(batch_inds)
 
-    def _get_samples(self, batch_inds: np.ndarray, env: Optional[VecNormalize] = None) -> CustomBufferSamples:
+    def _get_samples(self, batch_inds: np.ndarray) -> CustomBufferSamples:
         next_obs = self._normalize_obs(
-            self.observations[(batch_inds + 1) % self.buffer_size, :], env)
+            self.observations[(batch_inds + 1) % self.buffer_size, :])
 
         data = (
-            self._normalize_obs(self.observations[batch_inds, :], env),
+            self._normalize_obs(self.observations[batch_inds, :]),
             self.actions[batch_inds, :],
             next_obs,
             self.dones[batch_inds].reshape(-1, 1),
-            self._normalize_reward(
-                self.rewards[batch_inds].reshape(-1, 1), env),
+            self._normalize_reward(self.rewards[batch_inds].reshape(-1, 1)),
         )
         return CustomBufferSamples(*tuple(map(self.to_torch, data)))
 
