@@ -40,7 +40,6 @@ class CustomBuffer(BaseBuffer):
     :param observation_space: Observation space
     :param action_space: Action space
     :param device: PyTorch device
-    :param n_envs: Number of parallel environments
     """
 
     observations: np.ndarray
@@ -54,30 +53,29 @@ class CustomBuffer(BaseBuffer):
         buffer_size: int,
         observation_space: spaces.Space,
         action_space: spaces.Space,
-        device: Union[th.device, str] = "auto",
-        n_envs: int = 1,
+        device: Union[th.device, str],
     ):
-        super().__init__(buffer_size, observation_space, action_space, device, n_envs=n_envs)
+        super().__init__(buffer_size, observation_space, action_space, device, n_envs=1)
 
         # Adjust buffer size
-        self.buffer_size = max(buffer_size // n_envs, 1)
+        self.buffer_size = max(buffer_size, 1)
 
         # Check that the replay buffer can fit into the memory
         if psutil is not None:
             mem_available = psutil.virtual_memory().available
 
         self.observations = np.zeros(
-            (self.buffer_size, self.n_envs, *self.obs_shape), dtype=observation_space.dtype)
+            (self.buffer_size, 1, *self.obs_shape), dtype=observation_space.dtype)
 
         self.actions = np.zeros(
-            (self.buffer_size, self.n_envs,
+            (self.buffer_size, 1,
              self.action_dim), dtype=self._maybe_cast_dtype(action_space.dtype)
         )
 
         self.rewards = np.zeros(
-            (self.buffer_size, self.n_envs), dtype=np.float32)
+            (self.buffer_size, 1), dtype=np.float32)
         self.dones = np.zeros(
-            (self.buffer_size, self.n_envs), dtype=np.float32)
+            (self.buffer_size, 1), dtype=np.float32)
 
         if psutil is not None:
             total_memory_usage: float = (
@@ -106,17 +104,17 @@ class CustomBuffer(BaseBuffer):
         # Reshape needed when using multiple envs with discrete observations
         # as numpy cannot broadcast (n_discrete,) to (n_discrete, 1)
         if isinstance(self.observation_space, spaces.Discrete):
-            obs = obs.reshape((self.n_envs, *self.obs_shape))
-            next_obs = next_obs.reshape((self.n_envs, *self.obs_shape))
+            obs = obs.reshape((1, *self.obs_shape))
+            next_obs = next_obs.reshape((1, *self.obs_shape))
 
         # Reshape to handle multi-dim and discrete action spaces, see GH #970 #1392
-        action = action.reshape((self.n_envs, self.action_dim))
+        action = action.reshape((1, self.action_dim))
 
         # Copy to avoid modification by reference
         self.observations[self.pos] = np.array(obs)
 
         self.observations[(self.pos + 1) %
-                            self.buffer_size] = np.array(next_obs)
+                          self.buffer_size] = np.array(next_obs)
 
         self.actions[self.pos] = np.array(action)
         self.rewards[self.pos] = np.array(reward)
@@ -150,8 +148,7 @@ class CustomBuffer(BaseBuffer):
 
     def _get_samples(self, batch_inds: np.ndarray, env: Optional[VecNormalize] = None) -> CustomBufferSamples:
         # Sample randomly the env idx
-        env_indices = np.random.randint(
-            0, high=self.n_envs, size=(len(batch_inds),))
+        env_indices = np.random.randint(0, high=1, size=(len(batch_inds),))
 
         next_obs = self._normalize_obs(
             self.observations[(batch_inds + 1) % self.buffer_size, env_indices, :], env)
