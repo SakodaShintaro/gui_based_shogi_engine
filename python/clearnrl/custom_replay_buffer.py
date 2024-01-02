@@ -46,10 +46,6 @@ class CustomBuffer(BaseBuffer):
         at a cost of more complexity.
         See https://github.com/DLR-RM/stable-baselines3/issues/37#issuecomment-637501195
         and https://github.com/DLR-RM/stable-baselines3/pull/28#issuecomment-637559274
-        Cannot be used in combination with handle_timeout_termination.
-    :param handle_timeout_termination: Handle timeout termination (due to timelimit)
-        separately and treat the task as infinite horizon task.
-        https://github.com/DLR-RM/stable-baselines3/issues/284
     """
 
     observations: np.ndarray
@@ -66,8 +62,7 @@ class CustomBuffer(BaseBuffer):
         action_space: spaces.Space,
         device: Union[th.device, str] = "auto",
         n_envs: int = 1,
-        optimize_memory_usage: bool = False,
-        handle_timeout_termination: bool = True,
+        optimize_memory_usage: bool = False
     ):
         super().__init__(buffer_size, observation_space, action_space, device, n_envs=n_envs)
 
@@ -78,13 +73,6 @@ class CustomBuffer(BaseBuffer):
         if psutil is not None:
             mem_available = psutil.virtual_memory().available
 
-        # there is a bug if both optimize_memory_usage and handle_timeout_termination are true
-        # see https://github.com/DLR-RM/stable-baselines3/issues/934
-        if optimize_memory_usage and handle_timeout_termination:
-            raise ValueError(
-                "ReplayBuffer does not support optimize_memory_usage = True "
-                "and handle_timeout_termination = True simultaneously."
-            )
         self.optimize_memory_usage = optimize_memory_usage
 
         self.observations = np.zeros(
@@ -104,9 +92,6 @@ class CustomBuffer(BaseBuffer):
             (self.buffer_size, self.n_envs), dtype=np.float32)
         self.dones = np.zeros(
             (self.buffer_size, self.n_envs), dtype=np.float32)
-        # Handle timeouts termination properly if needed
-        # see https://github.com/DLR-RM/stable-baselines3/issues/284
-        self.handle_timeout_termination = handle_timeout_termination
         self.timeouts = np.zeros(
             (self.buffer_size, self.n_envs), dtype=np.float32)
 
@@ -158,10 +143,6 @@ class CustomBuffer(BaseBuffer):
         self.actions[self.pos] = np.array(action)
         self.rewards[self.pos] = np.array(reward)
         self.dones[self.pos] = np.array(done)
-
-        if self.handle_timeout_termination:
-            self.timeouts[self.pos] = np.array(
-                [info.get("TimeLimit.truncated", False) for info in infos])
 
         self.pos += 1
         if self.pos == self.buffer_size:

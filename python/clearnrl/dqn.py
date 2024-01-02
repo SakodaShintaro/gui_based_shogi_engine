@@ -107,7 +107,6 @@ if __name__ == "__main__":
         env.observation_space,
         env.action_space,
         device,
-        handle_timeout_termination=False,
     )
     start_time = time.time()
 
