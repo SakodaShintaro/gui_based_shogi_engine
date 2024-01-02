@@ -65,17 +65,15 @@ class CustomBuffer(BaseBuffer):
             mem_available = psutil.virtual_memory().available
 
         self.observations = np.zeros(
-            (self.buffer_size, 1, *self.obs_shape), dtype=observation_space.dtype)
+            (self.buffer_size, *self.obs_shape), dtype=observation_space.dtype)
 
         self.actions = np.zeros(
-            (self.buffer_size, 1,
-             self.action_dim), dtype=self._maybe_cast_dtype(action_space.dtype)
+            (self.buffer_size, self.action_dim), dtype=self._maybe_cast_dtype(
+                action_space.dtype)
         )
 
-        self.rewards = np.zeros(
-            (self.buffer_size, 1), dtype=np.float32)
-        self.dones = np.zeros(
-            (self.buffer_size, 1), dtype=np.float32)
+        self.rewards = np.zeros((self.buffer_size), dtype=np.float32)
+        self.dones = np.zeros((self.buffer_size), dtype=np.float32)
 
         if psutil is not None:
             total_memory_usage: float = (
@@ -147,20 +145,16 @@ class CustomBuffer(BaseBuffer):
         return self._get_samples(batch_inds, env=env)
 
     def _get_samples(self, batch_inds: np.ndarray, env: Optional[VecNormalize] = None) -> CustomBufferSamples:
-        # Sample randomly the env idx
-        env_indices = np.random.randint(0, high=1, size=(len(batch_inds),))
-
         next_obs = self._normalize_obs(
-            self.observations[(batch_inds + 1) % self.buffer_size, env_indices, :], env)
+            self.observations[(batch_inds + 1) % self.buffer_size, :], env)
 
         data = (
-            self._normalize_obs(
-                self.observations[batch_inds, env_indices, :], env),
-            self.actions[batch_inds, env_indices, :],
+            self._normalize_obs(self.observations[batch_inds, :], env),
+            self.actions[batch_inds, :],
             next_obs,
-            self.dones[batch_inds, env_indices].reshape(-1, 1),
+            self.dones[batch_inds].reshape(-1, 1),
             self._normalize_reward(
-                self.rewards[batch_inds, env_indices].reshape(-1, 1), env),
+                self.rewards[batch_inds].reshape(-1, 1), env),
         )
         return CustomBufferSamples(*tuple(map(self.to_torch, data)))
 
