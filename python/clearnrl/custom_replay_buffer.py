@@ -147,6 +147,10 @@ class CustomBuffer(BaseBuffer):
                 0, self.pos - self.seq_len, size=batch_size)
         return self._get_samples(batch_inds)
 
+    def get_latest(self) -> CustomBufferSamples:
+        batch_inds = np.array([self.pos - self.seq_len])
+        return self._get_samples(batch_inds)
+
     def _get_samples(self, batch_inds: np.ndarray) -> CustomBufferSamples:
         data_list = []
         for _ in range(self.seq_len):
@@ -165,9 +169,9 @@ class CustomBuffer(BaseBuffer):
         data = CustomBufferSamples(
             *tuple(map(lambda x: th.stack(x, dim=1), zip(*data_list))))
         data = CustomBufferSamples(
-            data.observations[:, -1],
+            data.observations,
             data.actions[:, -1],
-            data.next_observations[:, -1],
+            data.next_observations,
             data.dones[:, -1],
             data.rewards[:, -1],
         )

@@ -61,6 +61,7 @@ class QNetwork(nn.Module):
         )
 
     def forward(self, x):
+        x = x[:, -1]
         x = self.network(x)
         return x
 
@@ -123,8 +124,10 @@ if __name__ == "__main__":
         if random.random() < epsilon:
             actions = env.action_space.sample()
         else:
-            x = torch.Tensor(obs).to(device).unsqueeze(0)
-            q_values = q_network(x)
+            x = torch.Tensor(obs).to(device)
+            data = rb.get_latest()
+            data.observations[:, -1] = x
+            q_values = q_network(data.observations)
             actions = torch.argmax(q_values, dim=1).cpu().numpy()
 
         # TRY NOT TO MODIFY: execute the game and log data.
