@@ -53,7 +53,6 @@ class CustomBuffer(BaseBuffer):
     actions: np.ndarray
     rewards: np.ndarray
     dones: np.ndarray
-    timeouts: np.ndarray
 
     def __init__(
         self,
@@ -91,8 +90,6 @@ class CustomBuffer(BaseBuffer):
         self.rewards = np.zeros(
             (self.buffer_size, self.n_envs), dtype=np.float32)
         self.dones = np.zeros(
-            (self.buffer_size, self.n_envs), dtype=np.float32)
-        self.timeouts = np.zeros(
             (self.buffer_size, self.n_envs), dtype=np.float32)
 
         if psutil is not None:
@@ -189,10 +186,7 @@ class CustomBuffer(BaseBuffer):
                 self.observations[batch_inds, env_indices, :], env),
             self.actions[batch_inds, env_indices, :],
             next_obs,
-            # Only use dones that are not due to timeouts
-            # deactivated by default (timeouts is initialized as an array of False)
-            (self.dones[batch_inds, env_indices] * (1 - \
-             self.timeouts[batch_inds, env_indices])).reshape(-1, 1),
+            self.dones[batch_inds, env_indices].reshape(-1, 1),
             self._normalize_reward(
                 self.rewards[batch_inds, env_indices].reshape(-1, 1), env),
         )
