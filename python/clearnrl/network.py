@@ -1,4 +1,5 @@
 from torch import nn
+import math
 
 
 class QNetwork(nn.Module):
@@ -27,6 +28,22 @@ class QNetwork(nn.Module):
         return x
 
 
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model: int, max_len: int):
+        super().__init__()
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2)
+                             * (-math.log(10000.0) / d_model))
+        pe = torch.zeros(1, max_len, d_model)
+        pe[0, :, 0::2] = torch.sin(position * div_term)
+        pe[0, :, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(0)]
+        return x
+
+
 class TransformerQNetwork(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
@@ -41,6 +58,7 @@ class TransformerQNetwork(nn.Module):
             nn.Flatten()
         )
 
+        self.positional_encoding = PositionalEncoding(feature_dim, 20)
         transformer_layer = nn.TransformerEncoderLayer(
             feature_dim, 8, dim_feedforward=(feature_dim * 4), dropout=0.0, norm_first=True)
         layers = nn.TransformerEncoder(transformer_layer, 1)
@@ -52,12 +70,13 @@ class TransformerQNetwork(nn.Module):
         x = x.view((bs * seq_len, c, h, w))
         x = self.encoder(x)
         x = x.view((bs, seq_len, -1))
+        x = self.positional_encoding(x)
         x = self.transformer(x)
         x = x[:, -1]
         return x
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     import torch
     bs = 32
     seq_len = 20
