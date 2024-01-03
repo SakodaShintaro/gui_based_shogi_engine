@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 import math
 
@@ -77,7 +78,6 @@ class TransformerQNetwork(nn.Module):
 
 
 if __name__ == "__main__":
-    import torch
     bs = 32
     seq_len = 20
     ch = 2
