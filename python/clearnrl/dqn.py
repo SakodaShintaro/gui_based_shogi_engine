@@ -110,6 +110,7 @@ if __name__ == "__main__":
             reward = torch.roll(data.rewards, -1, 1)
             total_time = torch.roll(data.total_times, -1, 1)
             q_values = q_network(observation, action, reward)
+            q_values = q_values[:, -1]
             actions = torch.argmax(q_values, dim=1).cpu().numpy()
 
         # TRY NOT TO MODIFY: execute the game and log data.
@@ -150,12 +151,13 @@ if __name__ == "__main__":
                 next_act = torch.roll(curr_act, -1, 1)
                 next_rew = torch.roll(curr_rew, -1, 1)
                 with torch.no_grad():
-                    target_max, _ = target_network(
-                        next_obs, next_act, next_rew).max(dim=1)
+                    target_q = target_network(next_obs, next_act, next_rew)
+                    target_max, _ = target_q[:, -1].max(dim=1)
                     td_target = data.rewards[:, -1].flatten() + args.discount_factor * target_max * \
                         (1 - data.dones[:, -1].flatten())
-                old_val = q_network(curr_obs, curr_act, curr_rew).gather(
-                    1, data.actions[:, -1]).squeeze()
+                curr_q = q_network(curr_obs, curr_act, curr_rew)
+                curr_q = curr_q[:, -1]
+                old_val = curr_q.gather(1, data.actions[:, -1]).squeeze()
                 loss = F.mse_loss(td_target, old_val)
 
                 if global_step % 100 == 0:

@@ -83,6 +83,8 @@ class TransformerQNetwork(nn.Module):
         x = self.positional_encoding(x)
         mask = nn.Transformer.generate_square_subsequent_mask(x.shape[1])
         x = self.transformer(x, mask=mask, is_causal=True)
-        x = x[:, -3]
-        x = self.head(x)
-        return x
+        a = x[:, 0::3]
+        r = x[:, 1::3]
+        s = x[:, 2::3]
+        a = self.head(a)
+        return a
