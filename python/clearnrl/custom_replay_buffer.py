@@ -175,14 +175,6 @@ class CustomBuffer(BaseBuffer):
             batch_inds = (batch_inds + 1) % self.buffer_size
         data = CustomBufferSamples(
             *tuple(map(lambda x: th.stack(x, dim=1), zip(*data_list))))
-        data = CustomBufferSamples(
-            data.observations,
-            data.actions,
-            data.next_observations,
-            data.dones,
-            data.rewards,
-            data.total_times,
-        )
         return data
 
     @staticmethod

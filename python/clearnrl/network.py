@@ -86,23 +86,3 @@ class TransformerQNetwork(nn.Module):
         x = x[:, -3]
         x = self.head(x)
         return x
-
-
-if __name__ == "__main__":
-    bs = 32
-    seq_len = 20
-    ch = 2
-    h = 36
-    w = 36
-    out_ch = 5
-
-    data = torch.randn((bs, seq_len, ch, h, w))
-    print(data.shape)
-
-    model = QNetwork(ch, 5)
-    out = model(data)
-    print(out.shape)
-
-    model = TransformerQNetwork(ch, 5)
-    out = model(data)
-    print(out.shape)
