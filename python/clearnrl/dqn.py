@@ -17,7 +17,7 @@ import random
 
 from env_grid_world import CustomEnv
 from custom_replay_buffer import CustomBuffer
-from network import QNetwork
+from network import TransformerQNetwork
 
 
 @dataclass
@@ -72,9 +72,9 @@ if __name__ == "__main__":
     in_channels = env.observation_space.shape[0]
     out_channels = env.action_space.n
 
-    q_network = QNetwork(in_channels, out_channels).to(device)
+    q_network = TransformerQNetwork(in_channels, out_channels).to(device)
     optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
-    target_network = QNetwork(in_channels, out_channels).to(device)
+    target_network = TransformerQNetwork(in_channels, out_channels).to(device)
     target_network.load_state_dict(q_network.state_dict())
 
     rb = CustomBuffer(
@@ -100,8 +100,12 @@ if __name__ == "__main__":
         else:
             x = torch.Tensor(obs).to(device)
             data = rb.get_latest()
-            data.observations[:, -1] = x
-            q_values = q_network(data.observations)
+            observation = torch.roll(data.observations, -1, 1)
+            observation[:, -1] = x
+            action = torch.roll(data.actions, -1, 1)
+            reward = torch.roll(data.rewards, -1, 1)
+            total_time = torch.roll(data.total_times, -1, 1)
+            q_values = q_network(observation, action, reward)
             actions = torch.argmax(q_values, dim=1).cpu().numpy()
 
         # TRY NOT TO MODIFY: execute the game and log data.
@@ -133,13 +137,21 @@ if __name__ == "__main__":
         if global_step > args.learning_starts:
             if global_step % args.train_frequency == 0:
                 data = rb.sample(args.batch_size)
+                curr_obs = data.observations
+                curr_act = data.actions
+                curr_rew = data.rewards
+
+                next_obs = data.next_observations
+                # 1つシフトすることでnextとする(最後の一個に入っているものはなんでも良いためこれで良い)
+                next_act = torch.roll(curr_act, -1, 1)
+                next_rew = torch.roll(curr_rew, -1, 1)
                 with torch.no_grad():
                     target_max, _ = target_network(
-                        data.next_observations).max(dim=1)
-                    td_target = data.rewards.flatten() + args.discount_factor * target_max * \
-                        (1 - data.dones.flatten())
-                old_val = q_network(data.observations).gather(
-                    1, data.actions).squeeze()
+                        next_obs, next_act, next_rew).max(dim=1)
+                    td_target = data.rewards[:, -1].flatten() + args.discount_factor * target_max * \
+                        (1 - data.dones[:, -1].flatten())
+                old_val = q_network(curr_obs, curr_act, curr_rew).gather(
+                    1, data.actions[:, -1]).squeeze()
                 loss = F.mse_loss(td_target, old_val)
 
                 if global_step % 100 == 0:

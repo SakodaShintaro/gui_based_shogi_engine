@@ -30,6 +30,7 @@ class CustomBufferSamples(NamedTuple):
     next_observations: th.Tensor
     dones: th.Tensor
     rewards: th.Tensor
+    total_times: th.Tensor
 
 
 class CustomBuffer(BaseBuffer):
@@ -47,6 +48,7 @@ class CustomBuffer(BaseBuffer):
     actions: np.ndarray
     rewards: np.ndarray
     dones: np.ndarray
+    total_times: np.ndarray
 
     def __init__(
         self,
@@ -76,6 +78,7 @@ class CustomBuffer(BaseBuffer):
 
         self.rewards = np.zeros((self.buffer_size), dtype=np.float32)
         self.dones = np.zeros((self.buffer_size), dtype=np.float32)
+        self.total_times = np.zeros((self.buffer_size), dtype=np.float32)
 
         if psutil is not None:
             total_memory_usage: float = (
@@ -91,6 +94,7 @@ class CustomBuffer(BaseBuffer):
                     "This system does not have apparently enough memory to store the complete "
                     f"replay buffer {total_memory_usage:.2f}GB > {mem_available:.2f}GB"
                 )
+        self.total_time = 0
 
     def add(
         self,
@@ -119,11 +123,13 @@ class CustomBuffer(BaseBuffer):
         self.actions[self.pos] = np.array(action)
         self.rewards[self.pos] = np.array(reward)
         self.dones[self.pos] = np.array(done)
+        self.total_times[self.pos] = np.array(self.total_time)
 
         self.pos += 1
         if self.pos == self.buffer_size:
             self.full = True
             self.pos = 0
+        self.total_time += 1
 
     def sample(self, batch_size: int) -> CustomBufferSamples:
         """
@@ -162,6 +168,7 @@ class CustomBuffer(BaseBuffer):
                 self.dones[batch_inds].reshape(-1, 1),
                 self._normalize_reward(
                     self.rewards[batch_inds].reshape(-1, 1)),
+                self.total_times[batch_inds].reshape(-1, 1),
             )
             data_list.append(CustomBufferSamples(
                 *tuple(map(self.to_torch, data))))
@@ -170,10 +177,11 @@ class CustomBuffer(BaseBuffer):
             *tuple(map(lambda x: th.stack(x, dim=1), zip(*data_list))))
         data = CustomBufferSamples(
             data.observations,
-            data.actions[:, -1],
+            data.actions,
             data.next_observations,
-            data.dones[:, -1],
-            data.rewards[:, -1],
+            data.dones,
+            data.rewards,
+            data.total_times,
         )
         return data
 
