@@ -56,10 +56,11 @@ class CustomBuffer(BaseBuffer):
         observation_space: spaces.Space,
         action_space: spaces.Space,
         device: Union[th.device, str],
+        seq_len: int,
     ):
         super().__init__(buffer_size, observation_space, action_space, device, n_envs=1)
 
-        self.seq_len = 20
+        self.seq_len = seq_len
 
         # Adjust buffer size
         self.buffer_size = max(buffer_size, 1)

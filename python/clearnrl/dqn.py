@@ -38,6 +38,7 @@ class Args:
     exploration_fraction: float = 0.5
     learning_starts: int = 10000
     train_frequency: int = 10
+    seq_len: int = 40
 
 
 def linear_schedule(start_e: float, end_e: float, duration: int, t: int):
@@ -72,9 +73,11 @@ if __name__ == "__main__":
     in_channels = env.observation_space.shape[0]
     out_channels = env.action_space.n
 
-    q_network = TransformerQNetwork(in_channels, out_channels).to(device)
+    q_network = TransformerQNetwork(
+        in_channels, out_channels, args.seq_len).to(device)
     optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
-    target_network = TransformerQNetwork(in_channels, out_channels).to(device)
+    target_network = TransformerQNetwork(
+        in_channels, out_channels, args.seq_len).to(device)
     target_network.load_state_dict(q_network.state_dict())
 
     rb = CustomBuffer(
@@ -82,6 +85,7 @@ if __name__ == "__main__":
         env.observation_space,
         env.action_space,
         device,
+        args.seq_len,
     )
     start_time = time.time()
 

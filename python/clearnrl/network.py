@@ -46,7 +46,7 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerQNetwork(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, seq_len):
         super().__init__()
         feature_dim = 64
         self.encoder_obs = nn.Sequential(
@@ -63,7 +63,7 @@ class TransformerQNetwork(nn.Module):
 
         self.encoder_reward = nn.Linear(1, feature_dim)
 
-        self.positional_encoding = PositionalEncoding(feature_dim, 20 * 3)
+        self.positional_encoding = PositionalEncoding(feature_dim, seq_len * 3)
         transformer_layer = nn.TransformerEncoderLayer(
             feature_dim, 8, dim_feedforward=(feature_dim * 4), dropout=0.0, norm_first=True, batch_first=True)
         self.transformer = nn.TransformerEncoder(transformer_layer, 1)
