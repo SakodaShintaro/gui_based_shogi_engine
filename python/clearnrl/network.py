@@ -3,6 +3,31 @@ from torch import nn
 import math
 
 
+class CNN(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.network = nn.Sequential(
+            nn.Conv2d(in_channels, 32, kernel_size=8, stride=4, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=0),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(64, 512),
+            nn.ReLU(),
+            nn.Linear(512, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, out_channels),
+        )
+
+    def forward(self, x):
+        x = self.network(x)
+        return x
+
+
 class QNetwork(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
