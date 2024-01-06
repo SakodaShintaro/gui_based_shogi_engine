@@ -195,8 +195,6 @@ if __name__ == "__main__":
                     is_ideal_action[j] = infos["final_info"][j]["is_ideal_action"]
                 for info in infos["final_info"]:
                     if info and "episode" in info:
-                        print(
-                            f"global_step={global_step}, episodic_return={info['episode']['r']}")
                         writer.add_scalar(
                             "charts/episodic_return", info["episode"]["r"], global_step)
                         writer.add_scalar(
@@ -207,6 +205,7 @@ if __name__ == "__main__":
 
         ideal_action_rate = 100 * ideal_action_num / total_action_num
         writer.add_scalar("eval/ideal_rate", ideal_action_rate, global_step)
+        print(f"global_step: {global_step:07d}, ideal_action_rate: {ideal_action_rate:05.1f}%")
 
         # bootstrap value if not done
         with torch.no_grad():
@@ -311,7 +310,6 @@ if __name__ == "__main__":
         writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
         writer.add_scalar("losses/explained_variance",
                           explained_var, global_step)
-        print("SPS:", int(global_step / (time.time() - start_time)))
         writer.add_scalar("charts/SPS", int(global_step /
                           (time.time() - start_time)), global_step)
 
