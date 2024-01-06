@@ -164,8 +164,6 @@ if __name__ == "__main__":
                     writer.add_scalar("losses/td_loss", loss, global_step)
                     writer.add_scalar("losses/q_values",
                                       old_val.mean().item(), global_step)
-                    writer.add_scalar(
-                        "charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
                 # optimize the model
                 optimizer.zero_grad()
