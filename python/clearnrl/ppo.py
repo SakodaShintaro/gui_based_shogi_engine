@@ -162,6 +162,9 @@ if __name__ == "__main__":
             lrnow = frac * args.learning_rate
             optimizer.param_groups[0]["lr"] = lrnow
 
+        ideal_action_num = 0
+        total_action_num = 0
+
         for step in range(0, args.num_steps):
             global_step += args.num_envs
             obs[step] = next_obs
@@ -183,7 +186,13 @@ if __name__ == "__main__":
             next_obs, next_done = torch.Tensor(next_obs).to(
                 device), torch.Tensor(next_done).to(device)
 
+            is_ideal_action = infos["is_ideal_action"] if "is_ideal_action" in infos else np.zeros(
+                args.num_envs)
             if "final_info" in infos:
+                for j in range(len(infos["final_info"])):
+                    if infos["final_info"][j] is None:
+                        continue
+                    is_ideal_action[j] = infos["final_info"][j]["is_ideal_action"]
                 for info in infos["final_info"]:
                     if info and "episode" in info:
                         print(
@@ -192,6 +201,12 @@ if __name__ == "__main__":
                             "charts/episodic_return", info["episode"]["r"], global_step)
                         writer.add_scalar(
                             "charts/episodic_length", info["episode"]["l"], global_step)
+
+            ideal_action_num += is_ideal_action.sum()
+            total_action_num += is_ideal_action.shape[0]
+
+        ideal_action_rate = 100 * ideal_action_num / total_action_num
+        writer.add_scalar("eval/ideal_rate", ideal_action_rate, global_step)
 
         # bootstrap value if not done
         with torch.no_grad():
