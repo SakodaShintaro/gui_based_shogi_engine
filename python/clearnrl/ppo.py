@@ -20,13 +20,9 @@ from network import CNN
 @dataclass
 class Args:
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
-    """the name of this experiment"""
     seed: int = 1
-    """seed of the experiment"""
     torch_deterministic: bool = True
-    """if toggled, `torch.backends.cudnn.deterministic=False`"""
     cuda: bool = True
-    """if toggled, cuda will be enabled by default"""
 
     # Algorithm specific arguments
     total_timesteps: int = 100000
@@ -51,7 +47,7 @@ class Args:
     """Toggles advantages normalization"""
     clip_coef: float = 0.2
     """the surrogate clipping coefficient"""
-    clip_vloss: bool = True
+    clip_v_loss: bool = True
     """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
     ent_coef: float = 0.01
     """coefficient of the entropy"""
@@ -141,7 +137,7 @@ if __name__ == "__main__":
                       envs.single_observation_space.shape).to(device)
     actions = torch.zeros((args.num_steps, args.num_envs) +
                           envs.single_action_space.shape).to(device)
-    logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
+    log_probs = torch.zeros((args.num_steps, args.num_envs)).to(device)
     rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs)).to(device)
@@ -157,8 +153,7 @@ if __name__ == "__main__":
         # Annealing the rate if instructed to do so.
         if args.anneal_lr:
             frac = 1.0 - (iteration - 1.0) / args.num_iterations
-            lrnow = frac * args.learning_rate
-            optimizer.param_groups[0]["lr"] = lrnow
+            optimizer.param_groups[0]["lr"] = frac * args.learning_rate
 
         ideal_action_num = 0
         total_action_num = 0
@@ -170,11 +165,11 @@ if __name__ == "__main__":
 
             # ALGO LOGIC: action logic
             with torch.no_grad():
-                action, logprob, _, value = agent.get_action_and_value(
+                action, log_prob, _, value = agent.get_action_and_value(
                     next_obs)
                 values[step] = value.flatten()
             actions[step] = action
-            logprobs[step] = logprob
+            log_probs[step] = log_prob
 
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, terminations, truncations, infos = envs.step(
@@ -203,56 +198,57 @@ if __name__ == "__main__":
 
         ideal_action_rate = 100 * ideal_action_num / total_action_num
         writer.add_scalar("eval/ideal_rate", ideal_action_rate, global_step)
-        print(f"global_step: {global_step:07d}, ideal_action_rate: {ideal_action_rate:05.1f}%")
+        print(
+            f"global_step: {global_step:07d}, ideal_action_rate: {ideal_action_rate:05.1f}%")
 
         # bootstrap value if not done
         with torch.no_grad():
             next_value = agent.get_value(next_obs).reshape(1, -1)
             advantages = torch.zeros_like(rewards).to(device)
-            lastgaelam = 0
+            last_gae_lam = 0
             for t in reversed(range(args.num_steps)):
                 if t == args.num_steps - 1:
-                    nextnonterminal = 1.0 - next_done
-                    nextvalues = next_value
+                    next_non_terminal = 1.0 - next_done
+                    next_values = next_value
                 else:
-                    nextnonterminal = 1.0 - dones[t + 1]
-                    nextvalues = values[t + 1]
+                    next_non_terminal = 1.0 - dones[t + 1]
+                    next_values = values[t + 1]
                 delta = rewards[t] + args.gamma * \
-                    nextvalues * nextnonterminal - values[t]
-                advantages[t] = lastgaelam = delta + args.gamma * \
-                    args.gae_lambda * nextnonterminal * lastgaelam
+                    next_values * next_non_terminal - values[t]
+                advantages[t] = last_gae_lam = delta + args.gamma * \
+                    args.gae_lambda * next_non_terminal * last_gae_lam
             returns = advantages + values
 
         # flatten the batch
         b_obs = obs.reshape((-1,) + envs.single_observation_space.shape)
-        b_logprobs = logprobs.reshape(-1)
+        b_log_probs = log_probs.reshape(-1)
         b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
         b_advantages = advantages.reshape(-1)
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)
 
         # Optimizing the policy and value network
-        b_inds = np.arange(args.batch_size)
-        clipfracs = []
+        b_indices = np.arange(args.batch_size)
+        clip_fractions = []
         for epoch in range(args.update_epochs):
-            np.random.shuffle(b_inds)
+            np.random.shuffle(b_indices)
             for start in range(0, args.batch_size, args.minibatch_size):
                 end = start + args.minibatch_size
-                mb_inds = b_inds[start:end]
+                mb_indices = b_indices[start:end]
 
-                _, newlogprob, entropy, newvalue = agent.get_action_and_value(
-                    b_obs[mb_inds], b_actions.long()[mb_inds])
-                logratio = newlogprob - b_logprobs[mb_inds]
-                ratio = logratio.exp()
+                _, new_log_prob, entropy, new_value = agent.get_action_and_value(
+                    b_obs[mb_indices], b_actions.long()[mb_indices])
+                log_ratio = new_log_prob - b_log_probs[mb_indices]
+                ratio = log_ratio.exp()
 
                 with torch.no_grad():
                     # calculate approx_kl http://joschu.net/blog/kl-approx.html
-                    old_approx_kl = (-logratio).mean()
-                    approx_kl = ((ratio - 1) - logratio).mean()
-                    clipfracs += [((ratio - 1.0).abs() >
-                                   args.clip_coef).float().mean().item()]
+                    old_approx_kl = (-log_ratio).mean()
+                    approx_kl = ((ratio - 1) - log_ratio).mean()
+                    clip_fractions += [((ratio - 1.0).abs() >
+                                        args.clip_coef).float().mean().item()]
 
-                mb_advantages = b_advantages[mb_inds]
+                mb_advantages = b_advantages[mb_indices]
                 if args.norm_adv:
                     mb_advantages = (
                         mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
@@ -264,20 +260,20 @@ if __name__ == "__main__":
                 pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
                 # Value loss
-                newvalue = newvalue.view(-1)
-                if args.clip_vloss:
-                    v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
-                    v_clipped = b_values[mb_inds] + torch.clamp(
-                        newvalue - b_values[mb_inds],
+                new_value = new_value.view(-1)
+                if args.clip_v_loss:
+                    v_loss_unclipped = (new_value - b_returns[mb_indices]) ** 2
+                    v_clipped = b_values[mb_indices] + torch.clamp(
+                        new_value - b_values[mb_indices],
                         -args.clip_coef,
                         args.clip_coef,
                     )
-                    v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
+                    v_loss_clipped = (v_clipped - b_returns[mb_indices]) ** 2
                     v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
                     v_loss = 0.5 * v_loss_max.mean()
                 else:
                     v_loss = 0.5 * \
-                        ((newvalue - b_returns[mb_inds]) ** 2).mean()
+                        ((new_value - b_returns[mb_indices]) ** 2).mean()
 
                 entropy_loss = entropy.mean()
                 loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
@@ -302,7 +298,8 @@ if __name__ == "__main__":
         writer.add_scalar("losses/old_approx_kl",
                           old_approx_kl.item(), global_step)
         writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
-        writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
+        writer.add_scalar("losses/clip_fractions",
+                          np.mean(clip_fractions), global_step)
         writer.add_scalar("losses/explained_variance",
                           explained_var, global_step)
 
