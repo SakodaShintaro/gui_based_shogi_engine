@@ -1,4 +1,3 @@
-from utils import load_config
 from dreamer import Dreamer
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
@@ -6,6 +5,8 @@ import argparse
 import os
 from env_grid_world import CustomEnv
 import gymnasium as gym
+import yaml
+from attrdict import AttrDict
 
 
 def get_env_infos(env):
@@ -22,7 +23,9 @@ def get_env_infos(env):
 
 def main():
     config_file = "./config.yaml"
-    config = load_config(config_file)
+    with open(config_file) as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+    config =  AttrDict(config)
 
     env = CustomEnv(4)
     obs_shape, discrete_action_bool, action_size = get_env_infos(env)

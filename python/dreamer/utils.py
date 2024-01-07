@@ -124,21 +124,3 @@ class DynamicInfos:
 
     def clear(self):
         self.data = {}
-
-
-def find_file(file_name):
-    cur_dir = os.getcwd()
-
-    for root, dirs, files in os.walk(cur_dir):
-        if file_name in files:
-            return os.path.join(root, file_name)
-
-    raise FileNotFoundError(
-        f"File '{file_name}' not found in subdirectories of {cur_dir}"
-    )
-
-
-def load_config(config_path):
-    with open(config_path) as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-    return AttrDict(config)
