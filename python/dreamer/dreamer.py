@@ -77,7 +77,8 @@ class Dreamer:
     def train(self, env):
         for iteration in range(self.config.train_iterations):
             print(f"iteration = {iteration}")
-            self.environment_interaction(env, num_interaction_step=100, train=True)
+            self.environment_interaction(
+                env, num_interaction_step=100, train=True)
             for _ in tqdm(range(self.config.collect_interval)):
                 data = self.buffer.sample(
                     self.config.batch_size, self.config.batch_length
@@ -117,12 +118,16 @@ class Dreamer:
         return infos.posteriors.detach(), infos.deterministics.detach()
 
     def _model_update(self, data, posterior_info):
+        step = self.model_optimizer.state[self.model_optimizer.param_groups[0]
+                                          ["params"][-1]].get("step", 0)
         reconstructed_observation_dist = self.decoder(
             posterior_info.posteriors, posterior_info.deterministics
         )
         reconstruction_observation_loss = reconstructed_observation_dist.log_prob(
             data.observation[:, 1:]
         )
+        self.writer.add_scalar("train/reconstruction_observation_loss",
+                               reconstruction_observation_loss.mean(), step)
         if self.config.use_continue_flag:
             continue_dist = self.continue_predictor(
                 posterior_info.posteriors, posterior_info.deterministics
@@ -135,6 +140,7 @@ class Dreamer:
             posterior_info.posteriors, posterior_info.deterministics
         )
         reward_loss = reward_dist.log_prob(data.reward[:, 1:])
+        self.writer.add_scalar("train/reward_loss", reward_loss.mean(), step)
 
         prior_dist = create_normal_dist(
             posterior_info.prior_dist_means,
@@ -153,11 +159,14 @@ class Dreamer:
             torch.tensor(self.config.free_nats).to(
                 self.device), kl_divergence_loss
         )
+        self.writer.add_scalar("train/kl_divergence_loss",
+                               kl_divergence_loss, step)
         model_loss = (
             self.config.kl_divergence_scale * kl_divergence_loss
             - reconstruction_observation_loss.mean()
             - reward_loss.mean()
         )
+        self.writer.add_scalar("train/model_loss", model_loss, step)
         if self.config.use_continue_flag:
             model_loss += continue_loss.mean()
 
@@ -215,7 +224,10 @@ class Dreamer:
             self.config.lambda_,
         )
 
+        step_actor = self.actor_optimizer.state[self.actor_optimizer.param_groups[0]
+                                                ["params"][-1]].get("step", 0)
         actor_loss = -torch.mean(lambda_values)
+        self.writer.add_scalar("train/actor_loss", actor_loss, step_actor)
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
@@ -231,6 +243,9 @@ class Dreamer:
             behavior_learning_infos.deterministics.detach()[:, :-1],
         )
         value_loss = -torch.mean(value_dist.log_prob(lambda_values.detach()))
+        step_critic = self.critic_optimizer.state[self.critic_optimizer.param_groups[0]
+                                                  ["params"][-1]].get("step", 0)
+        self.writer.add_scalar("train/value_loss", value_loss, step_critic)
 
         self.critic_optimizer.zero_grad()
         value_loss.backward()
@@ -272,7 +287,8 @@ class Dreamer:
                 buffer_action = action.cpu().numpy()[0]
                 env_action = buffer_action
 
-            next_observation, reward, done, truncated, info = env.step(env_action)
+            next_observation, reward, done, truncated, info = env.step(
+                env_action)
             if train:
                 self.buffer.add(
                     observation, buffer_action, reward, next_observation, done
