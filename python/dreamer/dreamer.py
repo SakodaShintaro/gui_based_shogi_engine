@@ -14,6 +14,7 @@ from utils import (
     DynamicInfos,
 )
 from buffer import ReplayBuffer
+from tqdm import tqdm
 
 
 class Dreamer:
@@ -77,8 +78,7 @@ class Dreamer:
         for iteration in range(self.config.train_iterations):
             print(f"iteration = {iteration}")
             self.environment_interaction(env, num_interaction_step=100, train=True)
-            for collect_interval in range(self.config.collect_interval):
-                print(f"collect_interval = {collect_interval}")
+            for _ in tqdm(range(self.config.collect_interval)):
                 data = self.buffer.sample(
                     self.config.batch_size, self.config.batch_length
                 )
