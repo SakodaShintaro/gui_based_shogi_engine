@@ -74,11 +74,9 @@ class Dreamer:
         self.num_total_episode = 0
 
     def train(self, env):
-        if len(self.buffer) < 1:
-            self.environment_interaction(env, self.config.seed_episodes)
-
         for iteration in range(self.config.train_iterations):
             print(f"iteration = {iteration}")
+            self.environment_interaction(env, num_interaction_step=100, train=True)
             for collect_interval in range(self.config.collect_interval):
                 print(f"collect_interval = {collect_interval}")
                 data = self.buffer.sample(
@@ -86,14 +84,6 @@ class Dreamer:
                 )
                 posteriors, deterministics = self.dynamic_learning(data)
                 self.behavior_learning(posteriors, deterministics)
-
-            self.environment_interaction(
-                env, self.config.num_interaction_episodes)
-            self.evaluate(env)
-
-    def evaluate(self, env):
-        self.environment_interaction(
-            env, self.config.num_evaluate, train=False)
 
     def dynamic_learning(self, data):
         prior, deterministic = self.rssm.recurrent_model_input_init(
@@ -252,60 +242,58 @@ class Dreamer:
         self.critic_optimizer.step()
 
     @torch.no_grad()
-    def environment_interaction(self, env, num_interaction_episodes, train=True):
-        for epi in range(num_interaction_episodes):
-            posterior, deterministic = self.rssm.recurrent_model_input_init(1)
-            action = torch.zeros(1, self.action_size).to(self.device)
+    def environment_interaction(self, env, num_interaction_step, train):
+        posterior, deterministic = self.rssm.recurrent_model_input_init(1)
+        action = torch.zeros(1, self.action_size).to(self.device)
 
-            observation, _ = env.reset()
-            embedded_observation = self.encoder(
-                torch.from_numpy(observation).float().to(self.device)
+        observation, _ = env.reset()
+        embedded_observation = self.encoder(
+            torch.from_numpy(observation).float().to(self.device)
+        )
+
+        ideal_action_num = 0
+        total_action_num = 0
+
+        for _ in range(num_interaction_step):
+            deterministic = self.rssm.recurrent_model(
+                posterior, action, deterministic
             )
+            embedded_observation = embedded_observation.reshape(1, -1)
+            _, posterior = self.rssm.representation_model(
+                embedded_observation, deterministic
+            )
+            action = self.actor(posterior, deterministic).detach()
 
-            done = False
-            ideal_action_num = 0
-            total_action_num = 0
+            if self.discrete_action_bool:
+                buffer_action = action.cpu().numpy()
+                env_action = buffer_action.argmax()
 
-            while not done:
-                deterministic = self.rssm.recurrent_model(
-                    posterior, action, deterministic
-                )
-                embedded_observation = embedded_observation.reshape(1, -1)
-                _, posterior = self.rssm.representation_model(
-                    embedded_observation, deterministic
-                )
-                action = self.actor(posterior, deterministic).detach()
-
-                if self.discrete_action_bool:
-                    buffer_action = action.cpu().numpy()
-                    env_action = buffer_action.argmax()
-
-                else:
-                    buffer_action = action.cpu().numpy()[0]
-                    env_action = buffer_action
-
-                next_observation, reward, done, truncated, info = env.step(env_action)
-                if train:
-                    self.buffer.add(
-                        observation, buffer_action, reward, next_observation, done
-                    )
-                is_ideal_action = info["is_ideal_action"]
-                ideal_action_num += int(is_ideal_action)
-                total_action_num += 1
-                embedded_observation = self.encoder(
-                    torch.from_numpy(next_observation).float().to(self.device)
-                )
-                observation = next_observation
-
-            ideal_action_rate = 100 * ideal_action_num / total_action_num
-            if train:
-                self.num_total_episode += 1
-                self.writer.add_scalar(
-                    "train/ideal_action_rate", ideal_action_rate, self.num_total_episode
-                )
             else:
-                print(
-                    f"global_step: {self.num_total_episode:07d}, ideal_action_rate: {ideal_action_rate:05.1f}%")
-                self.writer.add_scalar(
-                    "eval/ideal_action_rate", ideal_action_rate, self.num_total_episode
+                buffer_action = action.cpu().numpy()[0]
+                env_action = buffer_action
+
+            next_observation, reward, done, truncated, info = env.step(env_action)
+            if train:
+                self.buffer.add(
+                    observation, buffer_action, reward, next_observation, done
                 )
+            is_ideal_action = info["is_ideal_action"]
+            ideal_action_num += int(is_ideal_action)
+            total_action_num += 1
+            embedded_observation = self.encoder(
+                torch.from_numpy(next_observation).float().to(self.device)
+            )
+            observation = next_observation
+
+        ideal_action_rate = 100 * ideal_action_num / total_action_num
+        if train:
+            self.num_total_episode += 1
+            self.writer.add_scalar(
+                "train/ideal_action_rate", ideal_action_rate, self.num_total_episode
+            )
+        else:
+            print(
+                f"global_step: {self.num_total_episode:07d}, ideal_action_rate: {ideal_action_rate:05.1f}%")
+            self.writer.add_scalar(
+                "eval/ideal_action_rate", ideal_action_rate, self.num_total_episode
+            )
