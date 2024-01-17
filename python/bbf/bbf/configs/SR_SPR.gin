@@ -3,9 +3,9 @@ import dopamine.jax.networks
 import dopamine.discrete_domains.gym_lib
 import dopamine.discrete_domains.run_experiment
 import dopamine.replay_memory.prioritized_replay_buffer
-import bigger_better_faster.bbf.spr_networksimport bigger_better_faster.bbf.agents.spr_agentimport bigger_better_faster.bbf.replay_memimport bigger_better_faster.bbf.ory.subsequence_replay_buffer.spr_networks
-import bigger_better_faster.bbf.spr_networksimport bigger_better_faster.bbf.agents.spr_agentimport bigger_better_faster.bbf.replay_memimport bigger_better_faster.bbf.ory.subsequence_replay_buffer.agents.spr_agent
-import bigger_better_faster.bbf.spr_networksimport bigger_better_faster.bbf.agents.spr_agentimport bigger_better_faster.bbf.replay_memimport bigger_better_faster.bbf.ory.subsequence_replay_buffer.replay_memory.subsequence_replay_buffer
+import bbf.spr_networksimport bbf.agents.spr_agentimport bbf.replay_memimport bbf.ory.subsequence_replay_buffer.spr_networks
+import bbf.spr_networksimport bbf.agents.spr_agentimport bbf.replay_memimport bbf.ory.subsequence_replay_buffer.agents.spr_agent
+import bbf.spr_networksimport bbf.agents.spr_agentimport bbf.replay_memimport bbf.ory.subsequence_replay_buffer.replay_memory.subsequence_replay_buffer
 
 JaxDQNAgent.gamma = 0.99
 JaxDQNAgent.min_replay_history = 2000 

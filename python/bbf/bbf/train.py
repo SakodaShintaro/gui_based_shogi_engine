@@ -40,8 +40,8 @@ import jax.profiler
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from bigger_better_faster.bbf import eval_run_experiment
-from bigger_better_faster.bbf.agents import spr_agent
+from bbf import eval_run_experiment
+from bbf.agents import spr_agent
 
 FLAGS = flags.FLAGS
 CONFIGS_DIR = './configs'

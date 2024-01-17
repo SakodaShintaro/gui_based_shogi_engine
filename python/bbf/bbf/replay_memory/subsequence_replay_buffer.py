@@ -31,7 +31,7 @@ from jax import numpy as jnp
 import numpy as np
 import tensorflow as tf
 
-from bigger_better_faster.bbf.replay_memory import deterministic_sum_tree as sum_tree
+from bbf.replay_memory import deterministic_sum_tree as sum_tree
 
 # Defines a type describing part of the tuple returned by the replay
 # memory. Each element of the tuple is a tensor of shape [batch, ...] where
