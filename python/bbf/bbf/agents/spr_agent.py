@@ -36,8 +36,8 @@ import numpy as onp
 import optax
 import tensorflow as tf
 
-from bigger_better_faster.bbf import spr_networks
-from bigger_better_faster.bbf.replay_memory import subsequence_replay_buffer
+from bbf import spr_networks
+from bbf.replay_memory import subsequence_replay_buffer
 
 
 def _pmap_device_order():
@@ -175,13 +175,8 @@ def interpolate_weights(
   if keys is None:
     keys = old_params.keys()
   for k in keys:
-    print(f"type(old_params) = {type(old_params)}")
-    print(f"type(new_params) = {type(new_params)}")
-    from flax.core import frozen_dict
-    old_params = frozen_dict.FrozenDict(old_params)
-    new_params = frozen_dict.FrozenDict(new_params)
-    print(f"type(old_params) = {type(old_params)}")
-    print(f"type(new_params) = {type(new_params)}")
+    old_params = FrozenDict(old_params)
+    new_params = FrozenDict(new_params)
     combined_params[k] = jax.tree_util.tree_map(combination, old_params[k],
                                                 new_params[k])
   for k, v in old_params.items():
@@ -1314,10 +1309,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         optax.masked(optimizer, self.head_mask),
     )
 
-    print(type(self.online_params))
-    from flax.core import frozen_dict
-    self.online_params = frozen_dict.FrozenDict(self.online_params)
-    print(type(self.online_params))
+    self.online_params = FrozenDict(self.online_params)
     self.optimizer_state = self.optimizer.init(self.online_params)
     self.target_network_params = copy.deepcopy(self.online_params)
     self.random_params = copy.deepcopy(self.online_params)
