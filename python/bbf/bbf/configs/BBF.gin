@@ -3,7 +3,7 @@ import dopamine.jax.networks
 import dopamine.discrete_domains.gym_lib
 import dopamine.discrete_domains.run_experiment
 import bbf.spr_networks
-import bbf.agents.spr_agent
+import bbf.spr_agent
 import bbf.replay_memory.subsequence_replay_buffer
 
 JaxDQNAgent.gamma = 0.997
@@ -53,15 +53,15 @@ bbf.spr_networks.RainbowDQNNetwork.width_scale = 4
 bbf.spr_networks.ImpalaCNN.num_blocks = 2
 
 # Note these parameters are from DER (van Hasselt et al, 2019)
-bbf.agents.spr_agent.create_scaling_optimizer.eps = 0.00015
-bbf.agents.spr_agent.create_scaling_optimizer.weight_decay = 0.1
+bbf.spr_agent.create_scaling_optimizer.eps = 0.00015
+bbf.spr_agent.create_scaling_optimizer.weight_decay = 0.1
 
-DataEfficientAtariRunner.game_name = 'ChopperCommand'
+DataEfficientAtariRunner.game_name = 'Breakout'
 # Atari 100K benchmark doesn't use sticky actions.
 atari_lib.create_atari_environment.sticky_actions = False
 AtariPreprocessing.terminal_on_life_loss = True
 Runner.num_iterations = 1
-Runner.training_steps = 100000    # agent steps
+Runner.training_steps = 10000    # agent steps
 DataEfficientAtariRunner.num_eval_episodes = 100    # agent episodes
 DataEfficientAtariRunner.num_eval_envs = 100    # agent episodes
 DataEfficientAtariRunner.num_train_envs = 1    # agent episodes
