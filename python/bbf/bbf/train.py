@@ -72,8 +72,6 @@ flags.DEFINE_integer(
     'replay buffer from a fixed dataset. If None, uses the `run_number`.')
 flags.DEFINE_boolean('data_logging', False,
                      'Whether to use agent to log the replay buffer or not.')
-flags.DEFINE_boolean('max_episode_eval', True,
-                     'Whether to use `MaxEpisodeEvalRunner` or not.')
 
 
 def load_gin_configs(gin_files, gin_bindings):
@@ -222,15 +220,7 @@ def main(unused_argv):
   # Set the Jax agent seed
   create_agent_fn = functools.partial(
       create_agent, seed=seed, data_logging=FLAGS.data_logging)
-  if FLAGS.max_episode_eval:
-    kwargs = dict(
-        load_replay_dir=FLAGS.load_replay_dir, save_replay=FLAGS.save_replay)
-    runner_fn = eval_run_experiment.DataEfficientAtariRunner
-    logging.info('Using MaxEpisodeEvalRunner for evaluation.')
-    kwargs = {}  # No additional flags should be passed.
-    runner = runner_fn(base_dir, create_agent_fn, **kwargs)
-  else:
-    runner = run_experiment.Runner(base_dir, create_agent_fn)
+  runner = eval_run_experiment.DataEfficientAtariRunner(base_dir, create_agent_fn)
 
   jax.profiler.start_server(9999)
   print(f'Found devices {jax.local_devices()}')

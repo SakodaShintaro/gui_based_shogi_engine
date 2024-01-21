@@ -631,31 +631,6 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     self._summary_writer.flush()
 
 
-@gin.configurable
-class LoggedDataEfficientAtariRunner(DataEfficientAtariRunner):
-  """Runner for loading/saving replay data."""
-
-  def __init__(self,
-               base_dir,
-               create_agent_fn,
-               load_replay_dir=None,
-               save_replay=False):
-    super().__init__(base_dir, create_agent_fn)
-    self._load_replay_dir = load_replay_dir
-    self._save_replay = save_replay
-    logging.info('Load fixed replay from directory: %s', load_replay_dir)
-    logging.info('Save replay: %s', save_replay)
-
-  def run_experiment(self):
-    """Runs a full experiment, spread over multiple iterations."""
-    if self._load_replay_dir is not None:
-      self._agent.load_fixed_replay(self._load_replay_dir)
-    super().run_experiment()
-    if self._save_replay:
-      save_replay_dir = os.path.join(self._base_dir, 'replay_logs')
-      self._agent.save_replay(save_replay_dir)
-
-
 def delete_ind_from_array(array, ind, axis=0):
   start = tuple(([slice(None)] * axis) + [slice(0, ind)])
   end = tuple(([slice(None)] * axis) + [slice(ind + 1, array.shape[axis] + 1)])
