@@ -1685,7 +1685,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       if self.summary_writer is not None:
         with self.summary_writer.as_default():
           for k, v in metrics.items():
-            tf.summary.scalar(k, v, step=self.training_steps)
+            tf.summary.scalar(f"Agent/{k}", v, step=self.training_steps)
       if self.verbose:
         logging.info(str(metrics))
 
