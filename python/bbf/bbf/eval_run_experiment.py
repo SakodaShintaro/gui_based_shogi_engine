@@ -182,14 +182,10 @@ class DataEfficientAtariRunner(run_experiment.Runner):
       base_dir,
       create_agent_fn,
       game_name=None,
-      create_environment_fn=atari_lib.create_atari_environment,
-      max_noops=30,
-      parallel_eval=True,
-      eval_one_to_one=True,
   ):
     """Specify the number of evaluation episodes."""
     create_environment_fn = functools.partial(
-        create_environment_fn, game_name=game_name
+        atari_lib.create_atari_environment, game_name=game_name
     )
     super().__init__(
         base_dir, create_agent_fn, create_environment_fn=create_environment_fn)
@@ -206,11 +202,11 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     logging.info(f"self.total_steps: {self.total_steps}")
     self.create_environment_fn = create_env_wrapper(create_environment_fn)
 
-    self.max_noops = max_noops
-    self.parallel_eval = parallel_eval
+    self.max_noops = 30
+    self.parallel_eval = True
     self.num_eval_envs = 100
     self.num_train_envs = 1
-    self.eval_one_to_one = eval_one_to_one
+    self.eval_one_to_one = True
 
     self.train_envs = [
         self.create_environment_fn() for i in range(self.num_train_envs)
