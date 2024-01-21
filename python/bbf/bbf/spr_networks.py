@@ -118,141 +118,43 @@ def drq_image_aug(key, obs, img_pad=4):
   return aug_obs.reshape(*obs.shape)
 
 
-# --------------------------- < NoisyNetwork >---------------------------------
-
-
-@gin.configurable
-class NoisyNetwork(nn.Module):
-  """Noisy Network from Fortunato et al. (2018)."""
-
-  features: int = 512
-  dtype: Dtype = jnp.float32
-  initializer: Any = nn.initializers.xavier_uniform()
-  factorized_sigma: bool = False
-
-  @staticmethod
-  def sample_noise(key, shape):
-    return random.normal(key, shape)
-
-  @staticmethod
-  def f(x):
-    # See (10) and (11) in Fortunato et al. (2018).
-    return jnp.multiply(jnp.sign(x), jnp.power(jnp.abs(x), 0.5))
-
-  @nn.compact
-  def __call__(self, x, rng_key, bias=True, kernel_init=None, eval_mode=False):
-    x = x.astype(self.dtype)
-
-    def mu_init(key, shape):
-      # Initialization of mean noise parameters (Section 3.2)
-      low = -1 / jnp.power(x.shape[-1], 0.5)
-      high = 1 / jnp.power(x.shape[-1], 0.5)
-      return random.uniform(key, minval=low, maxval=high, shape=shape)
-
-    def sigma_init(key, shape, dtype=jnp.float32):  # pylint: disable=unused-argument
-      """Initializes sigma noise parameters.
-
-      See the noisy nets paper, Section 3.2, for details.
-
-      Args:
-        key: Jax PRNG Key; unused, kept only to match type specs.
-        shape: Weight shape (tuple).
-        dtype: Dtype (float32, float16, bfloat16).
-
-      Returns:
-        Initialized weights.
-      """
-      return jnp.ones(shape, dtype) * (0.5 / onp.sqrt(x.shape[-1]))
-
-    # Factored gaussian noise in (10) and (11) in Fortunato et al. (2018).
-    p = NoisyNetwork.sample_noise(rng_key, [x.shape[-1], 1])
-    q = NoisyNetwork.sample_noise(rng_key, [1, self.features])
-    f_p = NoisyNetwork.f(p)
-    f_q = NoisyNetwork.f(q)
-
-    if self.factorized_sigma:
-      w_sigma_p = self.param('kernell', sigma_init, p.shape)
-      w_sigma_q = self.param('kernell', sigma_init, q.shape)
-      w_epsilon = jnp.multiply(w_sigma_p, f_p) * jnp.multiply(w_sigma_q, f_q)
-    else:
-      w_epsilon = f_p * f_q
-    b_epsilon = jnp.squeeze(f_q)
-
-    # See (8) and (9) in Fortunato et al. (2018) for output computation.
-    if self.initializer is None:
-      initializer = mu_init
-    else:
-      initializer = self.initializer
-    w_mu = self.param('kernel', initializer, (x.shape[-1], self.features))
-    w_sigma = self.param('kernell', sigma_init, (x.shape[-1], self.features))
-    w_epsilon = jnp.where(
-        eval_mode,
-        onp.zeros(shape=(x.shape[-1], self.features), dtype=onp.float32),
-        w_epsilon,
-    )
-    w = w_mu + jnp.multiply(w_sigma, w_epsilon)
-    ret = jnp.matmul(x, w)
-
-    b_epsilon = jnp.where(
-        eval_mode,
-        onp.zeros(shape=(self.features,), dtype=onp.float32),
-        b_epsilon,
-    )
-    b_mu = self.param('bias', mu_init, (self.features,))
-    b_sigma = self.param('biass', sigma_init, (self.features,))
-    b = b_mu + jnp.multiply(b_sigma, b_epsilon)
-    return jnp.where(bias, ret + b, ret)
-
-
 # --------------------------- < RainbowNetwork >--------------------------------
 class FeatureLayer(nn.Module):
-  """Layer encapsulating either a noisy linear or a standard linear layer.
+  """Layer encapsulating a standard linear layer.
 
   Attributes:
     net: The layer (nn.Module).
-    noisy: Whether noisy nets are used.
     features: Output size.
     dtype: Dtype (float32 | float16 | bfloat16)
     initializer: Jax initializer.
   """
-  noisy: bool
   features: int
   dtype: Dtype = jnp.float32
   initializer: Any = nn.initializers.xavier_uniform()
 
   def setup(self):
-    if self.noisy:
-      self.net = NoisyNetwork(
-          features=self.features, dtype=self.dtype, initializer=self.initializer
-      )
-    else:
-      self.net = nn.Dense(
-          self.features,
-          kernel_init=self.initializer,
-          dtype=self.dtype,
-      )
+    self.net = nn.Dense(
+        self.features,
+        kernel_init=self.initializer,
+        dtype=self.dtype,
+    )
 
   def __call__(self, x, key, eval_mode):
-    if self.noisy:
-      return self.net(x, key, True, None, eval_mode)
-    else:
-      return self.net(x)
+    return self.net(x)
 
 
 class LinearHead(nn.Module):
-  """A linear DQN head supporting dueling networks and noisy networks.
+  """A linear DQN head supporting dueling networks.
 
   Attributes:
     advantage: Advantage layer.
     value: Value layer (if dueling).
-    noisy: Whether to use noisy nets.
     dueling: Bool, whether to use dueling networks.
     num_actions: int, size of action space.
     num_atoms: int, number of value prediction atoms per action.
     dtype: Jax dtype.
     initializer: Jax initializer.
   """
-  noisy: bool
   dueling: bool
   num_actions: int
   num_atoms: int
@@ -262,20 +164,17 @@ class LinearHead(nn.Module):
   def setup(self):
     if self.dueling:
       self.advantage = FeatureLayer(
-          self.noisy,
           self.num_actions * self.num_atoms,
           dtype=self.dtype,
           initializer=self.initializer,
       )
       self.value = FeatureLayer(
-          self.noisy,
           self.num_atoms,
           dtype=self.dtype,
           initializer=self.initializer,
       )
     else:
       self.advantage = FeatureLayer(
-          self.noisy,
           self.num_actions * self.num_atoms,
           dtype=self.dtype,
           initializer=self.initializer,
@@ -700,14 +599,12 @@ class RainbowDQNNetwork(nn.Module):
   Attributes:
       num_actions: int, number of actions the agent can take at any state.
       num_atoms: int, the number of buckets of the value function distribution.
-      noisy: bool, Whether to use noisy networks.
       dueling: bool, Whether to use dueling network architecture.
       distributional: bool, whether to use distributional RL.
   """
 
   num_actions: int
   num_atoms: int
-  noisy: bool
   dueling: bool
   distributional: bool
   renormalize: bool = False
@@ -773,7 +670,6 @@ class RainbowDQNNetwork(nn.Module):
       self.embedder = SpatialLearnedEmbeddings(initializer=initializer)
 
     self.projection = FeatureLayer(
-        self.noisy,
         int(self.hidden_dim),
         dtype=jnp.float32,
         initializer=initializer,
@@ -784,7 +680,6 @@ class RainbowDQNNetwork(nn.Module):
     self.head = LinearHead(
         num_actions=self.num_actions,
         num_atoms=self.num_atoms,
-        noisy=self.noisy,
         dueling=self.dueling,
         dtype=jnp.float32,
         initializer=initializer,

@@ -985,7 +985,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
   def __init__(
       self,
       num_actions,
-      noisy=False,
       dueling=True,
       double_dqn=True,
       distributional=True,
@@ -1017,7 +1016,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       reset_head=True,
       reset_projection=True,
       reset_encoder=False,
-      reset_noise=True,
       reset_priorities=False,
       reset_interval_scaling=None,
       shrink_perturb_keys="",
@@ -1028,7 +1026,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       cycle_steps=0,
       target_update_period=1,
       target_action_selection=False,
-      eval_noise=True,
       use_target_network=True,
       match_online_target_rngs=True,
       target_eval_mode=False,
@@ -1044,7 +1041,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
 
     Args:
       num_actions: int, number of actions the agent can take at any state.
-      noisy: bool, Whether to use noisy networks or not.
       dueling: bool, Whether to use dueling network architecture or not.
       double_dqn: bool, Whether to use Double DQN or not.
       distributional: bool, whether to use distributional RL or not.
@@ -1087,8 +1083,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       reset_head: bool, whether to reset head on resets.
       reset_projection: bool, whether to reset penultimate layer on resets.
       reset_encoder: bool, whether to reset encoder on resets.
-      reset_noise: bool, whether to reset noisy nets noise parameters (no effect
-        if noisy nets are disabled).
       reset_priorities: bool, whether to reset priorities in replay buffer.
       reset_interval_scaling: Optional float, ratio by which to increase reset
         interval at each reset.
@@ -1101,7 +1095,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       cycle_steps: int, number of steps to anneal hyperparameters after reset.
       target_update_period: int, steps per target network update.
       target_action_selection: bool, act according to the target network.
-      eval_noise: bool, use noisy nets in evaluation.
       use_target_network: bool, enable the target network in training. Subtly
         different from setting tau=1.0, as it allows action selection according
         to an EMA policy, allowing decoupled investigation.
@@ -1125,7 +1118,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self.__class__.__name__,
     )
     logging.info("\t double_dqn: %s", double_dqn)
-    logging.info("\t noisy_networks: %s", noisy)
     logging.info("\t dueling_dqn: %s", dueling)
     logging.info("\t distributional: %s", distributional)
     logging.info("\t data_augmentation: %s", data_augmentation)
@@ -1140,7 +1132,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self._replay_scheme = replay_scheme
     self._replay_type = replay_type
     self._double_dqn = bool(double_dqn)
-    self._noisy = bool(noisy)
     self._dueling = bool(dueling)
     self._distributional = bool(distributional)
     self._data_augmentation = bool(data_augmentation)
@@ -1159,7 +1150,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self.reset_head = reset_head
     self.reset_projection = reset_projection
     self.reset_encoder = reset_encoder
-    self.reset_noise = reset_noise
     self.reset_priorities = reset_priorities
     self.offline_update_frac = float(offline_update_frac)
     self.no_resets_after = int(no_resets_after)
@@ -1180,7 +1170,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self.shrink_factor = shrink_factor
     self.perturb_factor = perturb_factor
 
-    self.eval_noise = eval_noise
     self.target_action_selection = target_action_selection
     self.use_target_network = use_target_network
     self.match_online_target_rngs = match_online_target_rngs
@@ -1237,7 +1226,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         network=functools.partial(
             network,
             num_atoms=self._num_atoms,
-            noisy=self._noisy,
             dueling=self._dueling,
             distributional=self._distributional,
             dtype=self.dtype,
@@ -1487,8 +1475,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       keys_to_copy.append("encoder")
       if self.spr_weight > 0:
         keys_to_copy.append("transition_model")
-    if not self.reset_noise:
-      keys_to_copy += ["kernell", "biass"]
     if not self.reset_head:
       keys_to_copy += ["head"]
     keys_to_copy = tuple(keys_to_copy)
@@ -1883,7 +1869,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     use_target = self.target_action_selection
     select_params = (
         self.target_network_params if use_target else self.online_params)
-    use_noise = self.eval_noise or not self.eval_mode
+    use_noise = not self.eval_mode
 
     action = self.select_action(
         state,
