@@ -35,9 +35,6 @@ DataEfficientAtariRunner.game_name = 'Pong'
 atari_lib.create_atari_environment.sticky_actions = True
 Runner.num_iterations = 200
 Runner.training_steps = 250000    # agent steps
-DataEfficientAtariRunner.num_eval_episodes = 100    # agent episodes
-DataEfficientAtariRunner.num_eval_envs = 100    # agent episodes
-DataEfficientAtariRunner.num_train_envs = 1    # agent episodes
 Runner.max_steps_per_episode = 27000    # agent steps
 
 bbf.replay_memory.subsequence_replay_buffer.PrioritizedJaxSubsequenceParallelEnvReplayBuffer.replay_capacity = 200000
