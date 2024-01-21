@@ -404,12 +404,11 @@ class DataEfficientAtariRunner(run_experiment.Runner):
 
           human_norm_ret = normalize_score(cum_rewards[-1], self.game_name)
 
-          print()
-          print('Steps executed: {} '.format(total_steps) +
-                'Num episodes: {} '.format(len(cum_rewards)) +
-                'Episode length: {} '.format(cum_lengths[-1]) +
-                'Return: {} '.format(cum_rewards[-1]) +
-                'Normalized Return: {}'.format(np.round(human_norm_ret, 3)))
+          print(f'Steps executed: {total_steps} ' +
+                f'Num episodes: {len(cum_rewards)} ' +
+                f'Episode length: {cum_lengths[-1]} ' +
+                f'Return: {cum_rewards[-1]} ' +
+                f'Normalized Return: {np.round(human_norm_ret, 3)}')
           self._maybe_save_single_summary(self.num_steps + total_steps,
                                           cum_rewards[-1], cum_lengths[-1])
 
