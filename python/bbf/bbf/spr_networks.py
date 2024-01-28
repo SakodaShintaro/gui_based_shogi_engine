@@ -40,14 +40,6 @@ Shape = Tuple[int]
 Dtype = Any
 
 
-class InitializerType(str, enum.Enum):
-  XAVIER_UNIFORM = 'xavier_uniform'
-  KAIMING_UNIFORM = 'kaiming_uniform'
-  XAVIER_NORMAL = 'xavier_normal'
-  KAIMING_NORMAL = 'kaiming_normal'
-  ORTHOGONAL = 'orthogonal'
-
-
 class NormType(str, enum.Enum):
   LN = 'ln'
   BN = 'bn'
@@ -298,8 +290,6 @@ class ImpalaCNN(nn.Module):
     norm_type: normalization to use. `none` to disable, otherwise options are
       'ln', 'bn' and 'gn'.
     dtype: Jax Dtype.
-    fixup_init: Whether to do a fixup-style init (final layer of each resblock
-      has weights set to 0).
     dropout: Dropout probability in [0, 1]. 0 to disable dropout.
     initializer: Jax initializer.
   """
@@ -308,7 +298,6 @@ class ImpalaCNN(nn.Module):
   num_blocks: int = 2
   norm_type: str = 'none'
   dtype: Dtype = jnp.float32
-  fixup_init: bool = False
   dropout: float = 0.0
   initializer: Any = nn.initializers.xavier_uniform()
 
@@ -321,7 +310,6 @@ class ImpalaCNN(nn.Module):
           dtype=self.dtype,
           norm_type=self.norm_type,
           dropout=self.dropout,
-          fixup_init=self.fixup_init,
           initializer=self.initializer,
       )(x, deterministic)
     x = nn.relu(x)
@@ -337,7 +325,6 @@ class ResidualStage(nn.Module):
     use_max_pooling: Whether to pool (downsample) before the blocks.
     norm_type: Normalization type, in {'none', 'bn', 'ln', 'gn'}.
     dtype: Jax dtype.
-    fixup_init: Whether to initialize the last weights in each block to 0.
     dropout: Dropout prob in [0, 1]. 0 disables.
     initializer: Jax initializer.
   """
@@ -347,16 +334,12 @@ class ResidualStage(nn.Module):
   use_max_pooling: bool = True
   norm_type: str = 'none'
   dtype: Dtype = jnp.float32
-  fixup_init: bool = False
   dropout: float = 0.0
   initializer: Any = nn.initializers.xavier_uniform()
 
   @nn.compact
   def __call__(self, x, deterministic=None):
-    if self.fixup_init:
-      final_initializer = nn.initializers.zeros
-    else:
-      final_initializer = self.initializer
+    final_initializer = self.initializer
     if self.norm_type == NormType.LN:
       norm = functools.partial(nn.LayerNorm,
                                epsilon=1e-5,
@@ -470,23 +453,9 @@ class RainbowDQNNetwork(nn.Module):
   width_scale: float = 1.0
   dtype: Dtype = jnp.float32
   use_spatial_learned_embeddings: bool = False
-  initializer_type: str = 'xavier_uniform'
 
   def setup(self):
-    if self.initializer_type == InitializerType.XAVIER_UNIFORM:
-      initializer = nn.initializers.xavier_uniform()
-    elif self.initializer_type == InitializerType.XAVIER_NORMAL:
-      initializer = nn.initializers.xavier_normal()
-    elif self.initializer_type == InitializerType.KAIMING_UNIFORM:
-      initializer = nn.initializers.kaiming_uniform()
-    elif self.initializer_type == InitializerType.KAIMING_NORMAL:
-      initializer = nn.initializers.kaiming_normal()
-    elif self.initializer_type == InitializerType.ORTHOGONAL:
-      initializer = nn.initializers.orthogonal()
-    else:
-      raise NotImplementedError(
-          'Unsupported initializer: {}'.format(self.initializer_type)
-      )
+    initializer = nn.initializers.xavier_uniform()
 
     self.encoder = ImpalaCNN(
         width_scale=self.width_scale,
