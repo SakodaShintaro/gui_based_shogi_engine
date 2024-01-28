@@ -402,7 +402,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
           print(f'Steps executed: {total_steps} ' +
                 f'Num episodes: {len(cum_rewards)} ' +
                 f'Episode length: {cum_lengths[-1]} ' +
-                f'Return: {cum_rewards[-1]} ' +
+                f'Return: {cum_rewards[-1]:4.1f} ' +
                 f'Normalized Return: {np.round(human_norm_ret, 3)}')
           self._maybe_save_single_summary(self.num_steps + total_steps,
                                           cum_rewards[-1], cum_lengths[-1])
