@@ -41,7 +41,5 @@ Runner.training_steps = 100000    # agent steps
 Runner.max_steps_per_episode = 27000    # agent steps
 
 bbf.replay_memory.subsequence_replay_buffer.PrioritizedJaxSubsequenceParallelEnvReplayBuffer.replay_capacity = 200000
-bbf.replay_memory.subsequence_replay_buffer.PrioritizedJaxSubsequenceParallelEnvReplayBuffer.n_envs = 1    # agent episodes
 bbf.replay_memory.subsequence_replay_buffer.JaxSubsequenceParallelEnvReplayBuffer.replay_capacity = 200000
-bbf.replay_memory.subsequence_replay_buffer.JaxSubsequenceParallelEnvReplayBuffer.n_envs = 1    # agent episodes
 

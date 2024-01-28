@@ -1347,7 +1347,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
           observation_dtype=self.observation_dtype,
       )
 
-    self.n_envs = buffer._n_envs  # pylint: disable=protected-access
+    self.n_envs = 1
     self.start = time.time()
     return buffer
 

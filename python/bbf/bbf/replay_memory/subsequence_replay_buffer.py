@@ -105,7 +105,6 @@ class JaxSubsequenceParallelEnvReplayBuffer(object):
       replay_capacity,
       batch_size,
       subseq_len,
-      n_envs=1,
       update_horizon=1,
       gamma=0.99,
       max_sample_attempts=1000,
@@ -126,7 +125,6 @@ class JaxSubsequenceParallelEnvReplayBuffer(object):
       replay_capacity: int, number of transitions to keep in memory.
       batch_size: int.
       subseq_len: int, length of subsequences to return.
-      n_envs: int, how many parallel environments will be writing data.
       update_horizon: int, length of update ('n' in n-step update).
       gamma: int, the discount factor.
       max_sample_attempts: int, the maximum number of attempts allowed to get a
@@ -184,11 +182,10 @@ class JaxSubsequenceParallelEnvReplayBuffer(object):
     self._subseq_len = subseq_len
     self._use_next_state = use_next_state
 
-    self._n_envs = n_envs
-    self._replay_length = int(replay_capacity // self._n_envs)
+    self._replay_length = int(replay_capacity)
 
     # Gotta round this down, since the matrix is rectangular.
-    self._replay_capacity = self._replay_length * self._n_envs
+    self._replay_capacity = self._replay_length
 
     self.total_steps = 0
 
@@ -211,7 +208,7 @@ class JaxSubsequenceParallelEnvReplayBuffer(object):
     """Creates the numpy arrays used to store transitions."""
     self._store = {}
     for storage_element in self.get_storage_signature():
-      array_shape = [self._replay_length, self._n_envs] + list(
+      array_shape = [self._replay_length, 1] + list(
           storage_element.shape
       )
       self._store[storage_element.name] = np.empty(
@@ -293,7 +290,7 @@ class JaxSubsequenceParallelEnvReplayBuffer(object):
     if priority is not None:
       args = args + (priority,)
 
-    self.total_steps += self._n_envs
+    self.total_steps += 1
 
     self._check_add_types(observation, action, reward, terminal, *args)
 
@@ -368,7 +365,7 @@ class JaxSubsequenceParallelEnvReplayBuffer(object):
         # Assume it is scalar.
         arg_shape = tuple()
       store_element_shape = tuple(store_element.shape)
-      assert arg_shape[0] == self._n_envs
+      assert arg_shape[0] == 1
       arg_shape = arg_shape[1:]
       if arg_shape != store_element_shape:
         raise ValueError('arg {} has shape {}, expected {}'.format(
@@ -384,11 +381,11 @@ class JaxSubsequenceParallelEnvReplayBuffer(object):
 
   def ravel_indices(self, indices_t, indices_b):
     return np.ravel_multi_index(
-        (indices_t, indices_b), (self._replay_length, self._n_envs), mode='wrap'
+        (indices_t, indices_b), (self._replay_length, 1), mode='wrap'
     )
 
   def unravel_indices(self, indices):
-    return np.unravel_index(indices, (self._replay_length, self._n_envs))
+    return np.unravel_index(indices, (self._replay_length, 1))
 
   def get_from_store(self, element_name, indices_t, indices_b):
     array = self._store[element_name]
@@ -483,7 +480,7 @@ class JaxSubsequenceParallelEnvReplayBuffer(object):
     if self.is_full():
       return self._replay_capacity
     else:
-      return self.cursor() * self._n_envs
+      return self.cursor()
 
   def sample_index_batch(self, batch_size):
     """Returns a batch of valid indices sampled uniformly.
@@ -513,7 +510,7 @@ class JaxSubsequenceParallelEnvReplayBuffer(object):
                                self._stack_size, self._update_horizon))
     t_indices = jax.random.randint(rng, (batch_size,), min_id,
                                    max_id) % self._replay_length
-    b_indices = jax.random.randint(rng, (batch_size,), 0, self._n_envs)
+    b_indices = jax.random.randint(rng, (batch_size,), 0, 1)
     allowed_attempts = self._max_sample_attempts
     t_indices = np.array(t_indices)
     censor_before = np.zeros_like(t_indices)
@@ -533,7 +530,7 @@ class JaxSubsequenceParallelEnvReplayBuffer(object):
           self._rng, rng = jax.random.split(self._rng)
           t_index = jax.random.randint(rng, (1,), min_id,
                                        max_id) % self._replay_length
-          b_index = jax.random.randint(rng, (1,), 0, self._n_envs)
+          b_index = jax.random.randint(rng, (1,), 0, 1)
           allowed_attempts -= 1
           t_indices[i] = t_index
           b_indices[i] = b_index
@@ -852,7 +849,6 @@ class PrioritizedJaxSubsequenceParallelEnvReplayBuffer(
                batch_size,
                update_horizon=1,
                subseq_len=0,
-               n_envs=1,
                gamma=0.99,
                max_sample_attempts=1000,
                extra_storage_types=None,
@@ -874,7 +870,6 @@ class PrioritizedJaxSubsequenceParallelEnvReplayBuffer(
         observation_dtype=observation_dtype,
         terminal_dtype=terminal_dtype,
         subseq_len=subseq_len,
-        n_envs=n_envs,
         action_shape=action_shape,
         action_dtype=action_dtype,
         reward_shape=reward_shape,
@@ -905,8 +900,8 @@ class PrioritizedJaxSubsequenceParallelEnvReplayBuffer(
         transition[element.name] = args[i]
 
     indices = np.ravel_multi_index(
-        (np.ones((1,), dtype='int32') * self.cursor(), np.arange(self._n_envs)),
-        (self._replay_length, self._n_envs),
+        (np.ones((1,), dtype='int32') * self.cursor(), np.arange(1)),
+        (self._replay_length, 1),
     )
 
     for i in range(len(indices)):
