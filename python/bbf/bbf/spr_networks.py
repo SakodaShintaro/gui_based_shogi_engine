@@ -184,7 +184,6 @@ class ConvTMCell(nn.Module):
 
   num_actions: int
   latent_dim: int
-  renormalize: bool
   dtype: Dtype = jnp.float32
   initializer: Any = nn.initializers.xavier_uniform()
 
@@ -215,8 +214,7 @@ class ConvTMCell(nn.Module):
     )(x)
     x = nn.relu(x)
 
-    if self.renormalize:
-      x = renormalize(x)
+    x = renormalize(x)
 
     return x, x
 
@@ -346,13 +344,11 @@ class TransitionModel(nn.Module):
   Attributes:
     num_actions: Size of action conditioning input.
     latent_dim: Number of channels.
-    renormalize: Whether to renormalize outputs to [0, 1] as in MuZero.
     dtype: Jax dtype.
     initializer: Jax initializer.
   """
   num_actions: int
   latent_dim: int
-  renormalize: bool
   dtype: Dtype = jnp.float32
   initializer: Any = nn.initializers.xavier_uniform()
 
@@ -367,7 +363,6 @@ class TransitionModel(nn.Module):
     )(
         latent_dim=self.latent_dim,
         num_actions=self.num_actions,
-        renormalize=self.renormalize,
         dtype=self.dtype,
         initializer=self.initializer,
     )
@@ -387,7 +382,6 @@ class RainbowDQNNetwork(nn.Module):
   num_actions: int
   num_atoms: int
   distributional: bool
-  renormalize: bool = False
   padding: Any = 'SAME'
   hidden_dim: int = 512
   width_scale: float = 1.0
@@ -406,7 +400,6 @@ class RainbowDQNNetwork(nn.Module):
     self.transition_model = TransitionModel(
         num_actions=self.num_actions,
         latent_dim=int(latent_dim),
-        renormalize=self.renormalize,
         dtype=self.dtype,
         initializer=initializer,
     )
@@ -428,8 +421,7 @@ class RainbowDQNNetwork(nn.Module):
 
   def encode(self, x, eval_mode=False):
     latent = self.encoder(x, deterministic=not eval_mode)
-    if self.renormalize:
-      latent = renormalize(latent)
+    latent = renormalize(latent)
     return latent
 
   def encode_project(self, x, key, eval_mode):

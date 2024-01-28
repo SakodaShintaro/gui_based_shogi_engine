@@ -44,7 +44,6 @@ BBFAgent.encoder_learning_rate = 0.0001
 BBFAgent.target_update_tau = 0.005
 BBFAgent.target_action_selection = True
 
-bbf.spr_networks.RainbowDQNNetwork.renormalize = True
 bbf.spr_networks.RainbowDQNNetwork.hidden_dim = 2048
 bbf.spr_networks.RainbowDQNNetwork.width_scale = 4
 bbf.spr_networks.ImpalaCNN.num_blocks = 2

@@ -34,7 +34,6 @@ BBFAgent.epsilon_fn = @jax.agents.dqn.dqn_agent.linearly_decaying_epsilon
 BBFAgent.learning_rate = 0.0001
 BBFAgent.encoder_learning_rate = 0.0001
 
-bbf.spr_networks.RainbowDQNNetwork.renormalize = True
 bbf.spr_networks.RainbowDQNNetwork.hidden_dim = 512
 bbf.spr_networks.RainbowDQNNetwork.use_sem = False
 bbf.spr_networks.RainbowDQNNetwork.width_scale = 1
