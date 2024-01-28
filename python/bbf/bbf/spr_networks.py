@@ -55,20 +55,7 @@ class NormType(str, enum.Enum):
   NONE = 'none'
 
 
-def _absolute_dims(rank, dims):
-  return tuple([rank + dim if dim < 0 else dim for dim in dims])
-
-
 # --------------------------- < Data Augmentation >-----------------------------
-
-
-def _random_crop(key, img, cropped_shape):
-  """Random crop an image."""
-  _, width, height = cropped_shape[:-1]
-  key_x, key_y = random.split(key, 2)
-  x = random.randint(key_x, shape=(), minval=0, maxval=img.shape[1] - width)
-  y = random.randint(key_y, shape=(), minval=0, maxval=img.shape[2] - height)
-  return img[:, x:x + width, y:y + height]
 
 
 # @functools.partial(jax.jit, static_argnums=(3,))
@@ -258,43 +245,6 @@ class ConvTMCell(nn.Module):
 
 
 @gin.configurable
-class RainbowCNN(nn.Module):
-  """DQN or Rainbow-style 3-layer CNN encoder.
-
-  Attributes:
-    padding: Padding style.
-    width_scale: Float, width scale.
-    dtype: Jax dtype.
-    dropout: Float, dropout probability. 0 to disable.
-    initializer: Jax initializer.
-  """
-  padding: Any = 'SAME'
-  dims = (32, 64, 64)
-  width_scale: int = 1
-  dtype: Dtype = jnp.float32
-  dropout: float = 0.0
-  initializer: Any = nn.initializers.xavier_uniform()
-
-  @nn.compact
-  def __call__(self, x, deterministic=None):
-    # x = x[None, Ellipsis]
-    kernel_sizes = [8, 4, 3]
-    stride_sizes = [4, 2, 1]
-    for layer in range(3):
-      x = nn.Conv(
-          features=int(self.dims[layer] * self.width_scale),
-          kernel_size=(kernel_sizes[layer], kernel_sizes[layer]),
-          strides=(stride_sizes[layer], stride_sizes[layer]),
-          kernel_init=self.initializer,
-          padding=self.padding,
-          dtype=self.dtype,
-      )(x)
-      x = nn.Dropout(self.dropout, broadcast_dims=(-3, -2))(x, deterministic)
-      x = nn.relu(x)
-    return x
-
-
-@gin.configurable
 class SpatialLearnedEmbeddings(nn.Module):
   """A learned spatial embedding class that can replace flattens or pooling.
 
@@ -463,93 +413,6 @@ class ResidualStage(nn.Module):
       )(conv_out)
       conv_out += block_input
     return conv_out
-
-
-class ResNetBlock(nn.Module):
-  """ResNet block."""
-  filters: int
-  conv: Any
-  norm: Any
-  act: Any
-  strides: Tuple[int, int] = (1, 1)
-
-  @nn.compact
-  def __call__(self, x):
-    residual = x
-    y = self.conv(self.filters, (3, 3), self.strides)(x)
-    y = self.norm()(y)
-    y = self.act(y)
-    y = self.conv(self.filters, (3, 3))(y)
-    y = self.norm()(y)
-
-    if residual.shape != y.shape:
-      residual = self.conv(
-          self.filters, (1, 1), self.strides, name='conv_proj')(
-              residual)
-      residual = self.norm(name='norm_proj')(residual)
-
-    return self.act(residual + y)
-
-
-@gin.configurable
-class ResNetEncoder(nn.Module):
-  """ResNet encoder defaulting to ResNet 18."""
-  stage_sizes: Sequence[int] = (2, 2, 2, 2)
-  num_filters: int = 64
-  norm: str = 'group'
-  width_scale: float = 1
-  act: Any = nn.relu
-  conv: Any = nn.Conv
-  strides = (2, 2, 2, 1, 1)
-  dtype: Any = jnp.float32
-
-  @nn.compact
-  def __call__(self, x, deterministic=None):
-    del deterministic
-    logging.info(
-        'Creating ResNetEncoder with %s stage_sizes, %s num_filters, %s'
-        'norm, %s width_scale, %s strides', self.stage_sizes, self.num_filters,
-        self.norm, self.width_scale, self.strides)
-
-    if self.norm == 'batch':
-      norm = functools.partial(
-          nn.BatchNorm, use_running_average=False, momentum=0.9,
-          epsilon=1e-5, dtype=self.dtype)
-    elif self.norm == 'group':
-      norm = functools.partial(
-          nn.GroupNorm,
-          epsilon=1e-5,
-          num_groups=None,
-          group_size=8,
-          dtype=self.dtype,
-      )
-    elif self.norm == 'layer':
-      norm = functools.partial(nn.LayerNorm, epsilon=1e-5, dtype=self.dtype)
-    else:
-      raise ValueError('norm not found')
-
-    x = nn.Conv(
-        int(self.num_filters*self.width_scale),
-        (7, 7), (self.strides[0], self.strides[0]),
-        padding=[(3, 3), (3, 3)],
-        name='conv_init')(x)
-
-    x = norm(name='bn_init')(x)
-    x = nn.relu(x)
-    x = nn.max_pool(
-        x, (3, 3), strides=(self.strides[1], self.strides[1]), padding='SAME')
-
-    for i, block_size in enumerate(self.stage_sizes):
-      for j in range(block_size):
-        stride = (self.strides[i + 1],
-                  self.strides[i + 1]) if i > 0 and j == 0 else (1, 1)
-        x = ResNetBlock(
-            int(self.num_filters * 2**i * self.width_scale),
-            strides=stride,
-            conv=self.conv,
-            norm=norm,
-            act=self.act)(x)
-    return x
 
 
 class TransitionModel(nn.Module):
