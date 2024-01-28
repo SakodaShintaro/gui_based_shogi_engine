@@ -21,7 +21,6 @@ BBFAgent.num_atoms = 51
 BBFAgent.vmax = 10.
 BBFAgent.replay_ratio = 32
 BBFAgent.batch_size = 32
-BBFAgent.replay_scheme = 'prioritized'
 
 # Note these parameters are from DER (van Hasselt et al, 2019)
 bbf.agents.spr_agent.create_scaling_optimizer.learning_rate = 0.0001

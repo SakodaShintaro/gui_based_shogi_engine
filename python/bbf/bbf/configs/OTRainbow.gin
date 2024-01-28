@@ -21,7 +21,6 @@ BBFAgent.num_atoms = 51
 BBFAgent.replay_ratio = 256
 BBFAgent.batch_size = 32
 BBFAgent.vmax = 10.
-BBFAgent.replay_scheme = 'prioritized'
 
 # Note these parameters are original Rainbow.
 bbf.agents.spr_agent.create_scaling_optimizer.learning_rate = 0.0000625

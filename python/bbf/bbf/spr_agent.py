@@ -972,7 +972,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       update_horizon=10,
       max_update_horizon=None,
       min_gamma=None,
-      replay_scheme="uniform",
       replay_type="deterministic",
       reset_every=-1,
       no_resets_after=-1,
@@ -1027,8 +1026,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       update_horizon: int, n-step return length.
       max_update_horizon: int, n-step start point for annealing.
       min_gamma: float, gamma start point for annealing.
-      replay_scheme: str, 'prioritized' or 'uniform', the sampling scheme of the
-        replay memory.
       replay_type: str, 'deterministic' or 'regular', specifies the type of
         replay buffer to create.
       reset_every: int, how many training steps between resets. 0 to disable.
@@ -1075,7 +1072,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self.__class__.__name__,
     )
     logging.info("\t data_augmentation: %s", data_augmentation)
-    logging.info("\t replay_scheme: %s", replay_scheme)
     logging.info("\t num_updates_per_train_step: %d",
                  num_updates_per_train_step)
     # We need casting because passing arguments can convert ints to floats
@@ -1083,7 +1079,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self._num_atoms = int(num_atoms)
     vmin = float(vmin) if vmin else -vmax
     self._support = jnp.linspace(vmin, vmax, self._num_atoms)
-    self._replay_scheme = replay_scheme
     self._replay_type = replay_type
     self._data_augmentation = bool(data_augmentation)
     self._replay_ratio = int(replay_ratio)
@@ -1263,30 +1258,17 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
 
   def _build_replay_buffer(self):
     """Creates the replay buffer used by the agent."""
-    if self._replay_scheme not in ["uniform", "prioritized"]:
-      raise ValueError("Invalid replay scheme: {}".format(self._replay_scheme))
     if self._replay_type not in ["deterministic"]:
       raise ValueError("Invalid replay type: {}".format(self._replay_type))
-    if self._replay_scheme == "prioritized":
-      buffer = subsequence_replay_buffer.PrioritizedJaxSubsequenceParallelEnvReplayBuffer(
-          observation_shape=self.observation_shape,
-          stack_size=self.stack_size,
-          update_horizon=self.max_update_horizon,
-          gamma=self.gamma,
-          subseq_len=self._jumps + 1,
-          batch_size=self._batch_size,
-          observation_dtype=self.observation_dtype,
-      )
-    else:
-      buffer = subsequence_replay_buffer.JaxSubsequenceParallelEnvReplayBuffer(
-          observation_shape=self.observation_shape,
-          stack_size=self.stack_size,
-          update_horizon=self.max_update_horizon,
-          gamma=self.gamma,
-          subseq_len=self._jumps + 1,
-          batch_size=self._batch_size,
-          observation_dtype=self.observation_dtype,
-      )
+    buffer = subsequence_replay_buffer.PrioritizedJaxSubsequenceParallelEnvReplayBuffer(
+        observation_shape=self.observation_shape,
+        stack_size=self.stack_size,
+        update_horizon=self.max_update_horizon,
+        gamma=self.gamma,
+        subseq_len=self._jumps + 1,
+        batch_size=self._batch_size,
+        observation_dtype=self.observation_dtype,
+    )
 
     self.n_envs = 1
     self.start = time.time()
@@ -1480,19 +1462,16 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
 
     if not hasattr(self, "replay_elements"):
       self._sample_from_replay_buffer()
-    if self._replay_scheme == "prioritized":
-      # The original prioritized experience replay uses a linear exponent
-      # schedule 0.4 -> 1.0. Comparing the schedule to a fixed exponent of
-      # 0.5 on 5 games (Asterix, Pong, Q*Bert, Seaquest, Space Invaders)
-      # suggested a fixed exponent actually performs better, except on Pong.
-      probs = self.replay_elements["sampling_probabilities"]
-      # Weight the loss by the inverse priorities.
-      loss_weights = 1.0 / onp.sqrt(probs + 1e-10)
-      loss_weights /= onp.max(loss_weights)
-      indices = self.replay_elements["indices"]
-    else:
-      # Uniform weights if not using prioritized replay.
-      loss_weights = onp.ones(self.replay_elements["state"].shape[0:2])
+
+    # The original prioritized experience replay uses a linear exponent
+    # schedule 0.4 -> 1.0. Comparing the schedule to a fixed exponent of
+    # 0.5 on 5 games (Asterix, Pong, Q*Bert, Seaquest, Space Invaders)
+    # suggested a fixed exponent actually performs better, except on Pong.
+    probs = self.replay_elements["sampling_probabilities"]
+    # Weight the loss by the inverse priorities.
+    loss_weights = 1.0 / onp.sqrt(probs + 1e-10)
+    loss_weights /= onp.max(loss_weights)
+    indices = self.replay_elements["indices"]
 
     if self.log_churn and should_log:
       eval_batch = self.sample_eval_batch(256)
@@ -1561,18 +1540,17 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     sample_time = time.time() - sample_start
 
     prio_set_start = time.time()
-    if self._replay_scheme == "prioritized":
-      # Rainbow and prioritized replay are parametrized by an exponent
-      # alpha, but in both cases it is set to 0.5 - for simplicity's sake we
-      # leave it as is here, using the more direct sqrt(). Taking the square
-      # root "makes sense", as we are dealing with a squared loss.  Add a
-      # small nonzero value to the loss to avoid 0 priority items. While
-      # technically this may be okay, setting all items to 0 priority will
-      # cause troubles, and also result in 1.0 / 0.0 = NaN correction terms.
-      indices = onp.reshape(onp.asarray(indices), (-1,))
-      dqn_loss = onp.reshape(onp.asarray(aux_losses["DQNLoss"]), (-1))
-      priorities = onp.sqrt(dqn_loss + 1e-10)
-      self._replay.set_priority(indices, priorities)
+    # Rainbow and prioritized replay are parametrized by an exponent
+    # alpha, but in both cases it is set to 0.5 - for simplicity's sake we
+    # leave it as is here, using the more direct sqrt(). Taking the square
+    # root "makes sense", as we are dealing with a squared loss.  Add a
+    # small nonzero value to the loss to avoid 0 priority items. While
+    # technically this may be okay, setting all items to 0 priority will
+    # cause troubles, and also result in 1.0 / 0.0 = NaN correction terms.
+    indices = onp.reshape(onp.asarray(indices), (-1,))
+    dqn_loss = onp.reshape(onp.asarray(aux_losses["DQNLoss"]), (-1))
+    priorities = onp.sqrt(dqn_loss + 1e-10)
+    self._replay.set_priority(indices, priorities)
     prio_set_time = time.time() - prio_set_start
 
     training_time = time.time() - train_start
@@ -1653,10 +1631,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     )
     if is_prioritized and priority is None:
       priority = onp.ones((last_observation.shape[0]))
-      if self._replay_scheme == "uniform":
-        pass  # Already 1, doesn't matter
-      else:
-        priority.fill(self._replay.sum_tree.max_recorded_priority)
+      priority.fill(self._replay.sum_tree.max_recorded_priority)
 
     if not self.eval_mode:
       self._replay.add(

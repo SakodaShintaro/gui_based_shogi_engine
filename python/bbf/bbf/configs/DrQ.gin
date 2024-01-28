@@ -24,7 +24,6 @@ BBFAgent.replay_ratio = 32
 BBFAgent.batch_size = 32
 BBFAgent.data_augmentation = True
 BBFAgent.target_update_period = 1    # DrQ (rather than 8000)
-BBFAgent.replay_scheme = 'uniform'
 
 # Note these parameters are from DER (van Hasselt et al, 2019)
 bbf.agents.rainbow_agent.create_scaling_optimizer.learning_rate = 0.0001
