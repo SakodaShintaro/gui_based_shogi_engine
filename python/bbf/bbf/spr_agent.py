@@ -468,14 +468,13 @@ def get_spr_targets(model, states, key):
 train_static_argnums = (
     0,
     3,
-    14,
-    16,
+    15,
+    17,
     18,
     19,
     20,
-    21,
+    24,
     25,
-    26,
 )
 train_donate_argnums = (1, 2, 4)
 
@@ -495,19 +494,18 @@ def train(
     loss_weights,  # 11
     support,  # 12
     cumulative_gamma,  # 13
-    double_dqn,  # 14, static
-    rng,  # 15
-    spr_weight,  # 16, static (gates rollouts)
-    dynamic_scale,  # 17
-    data_augmentation,  # 18, static
-    dtype,  # 19, static
-    batch_size,  # 20, static
-    use_target_backups,  # 21, static
-    target_update_tau,  # 22
-    target_update_every,  # 23
-    step,  # 24
-    match_online_target_rngs,  # 25, static
-    target_eval_mode,  # 26, static
+    rng,  # 14
+    spr_weight,  # 15, static (gates rollouts)
+    dynamic_scale,  # 16
+    data_augmentation,  # 19, static
+    dtype,  # 20, static
+    batch_size,  # 21, static
+    use_target_backups,  # 22, static
+    target_update_tau,  # 23
+    target_update_every,  # 24
+    step,  # 25
+    match_online_target_rngs,  # 26, static
+    target_eval_mode,  # 27, static
 ):
   """Run one or more training steps for BBF.
 
@@ -527,7 +525,6 @@ def train(
     support: support for the categorical distribution in C51, if used.
       (num_atoms,) array.
     cumulative_gamma: Discount factors (B,), gamma^n for the current n, gamma.
-    double_dqn: Bool, whether to use double DQN.
     rng: JAX PRNG Key.
     spr_weight: SPR loss weight, float.
     dynamic_scale: Dynamic scale object, if mixed precision is used.
@@ -702,7 +699,6 @@ def train(
         terminals,
         support,
         cumulative_gamma,
-        double_dqn,
         use_target_backups,
         target_rng,
     )
@@ -837,7 +833,7 @@ def train(
 
 @functools.partial(
     jax.vmap,
-    in_axes=(None, None, 0, 0, 0, None, 0, None, None, 0),
+    in_axes=(None, None, 0, 0, 0, None, 0, None, 0),
     axis_name="batch",
 )
 def target_output(
@@ -848,7 +844,6 @@ def target_output(
     terminals,
     support,
     cumulative_gamma,
-    double_dqn,
     use_target_backups,
     rng,
 ):
@@ -857,14 +852,13 @@ def target_output(
   # Incorporate terminal state to discount factor.
   gamma_with_terminal = cumulative_gamma * is_terminal_multiplier
 
-  if use_target_backups or not double_dqn:
+  if use_target_backups:
     target_dist, _ = target_network(next_states, key=rng)
-  if not use_target_backups or double_dqn:
-    online_dist, _ = model(next_states, key=rng)
+  online_dist, _ = model(next_states, key=rng)
 
   backup_dist = target_dist if use_target_backups else online_dist
   # Double DQN uses the current network for the action selection
-  select_dist = online_dist if double_dqn else target_dist
+  select_dist = online_dist
   # Action selection using Q-values for next-state
   q_values = jnp.squeeze(select_dist.q_values)
   next_qt_argmax = jnp.argmax(q_values)
@@ -965,7 +959,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
   def __init__(
       self,
       num_actions,
-      double_dqn=True,
       data_augmentation=False,
       num_updates_per_train_step=1,
       network=spr_networks.RainbowDQNNetwork,
@@ -1019,7 +1012,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
 
     Args:
       num_actions: int, number of actions the agent can take at any state.
-      double_dqn: bool, Whether to use Double DQN or not.
       data_augmentation: bool, Whether to use data augmentation or not.
       num_updates_per_train_step: int, Number of gradient updates every training
         step. Defaults to 1.
@@ -1093,7 +1085,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         "Creating %s agent with the following parameters:",
         self.__class__.__name__,
     )
-    logging.info("\t double_dqn: %s", double_dqn)
     logging.info("\t data_augmentation: %s", data_augmentation)
     logging.info("\t replay_scheme: %s", replay_scheme)
     logging.info("\t num_updates_per_train_step: %d",
@@ -1105,7 +1096,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self._support = jnp.linspace(vmin, vmax, self._num_atoms)
     self._replay_scheme = replay_scheme
     self._replay_type = replay_type
-    self._double_dqn = bool(double_dqn)
     self._data_augmentation = bool(data_augmentation)
     self._replay_ratio = int(replay_ratio)
     self._batch_size = int(batch_size)
@@ -1568,7 +1558,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         loss_weights,
         self._support,
         self.replay_elements["discount"],
-        self._double_dqn,
         train_rng,
         self.spr_weight,
         self.dynamic_scale,

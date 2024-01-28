@@ -19,7 +19,6 @@ JaxDQNAgent.epsilon_eval = 0.001
 JaxDQNAgent.epsilon_decay_period = 2500    # DrQ
 JaxDQNAgent.optimizer = 'adam'
 
-BBFAgent.double_dqn = True
 BBFAgent.num_atoms = 1    # Since DrQ uses DQN, rather than C51
 BBFAgent.replay_ratio = 32
 BBFAgent.batch_size = 32
