@@ -30,7 +30,6 @@ BBFAgent.spr_weight = 5
 BBFAgent.jumps = 5
 BBFAgent.data_augmentation = True
 BBFAgent.replay_scheme = 'prioritized'
-BBFAgent.half_precision = False
 BBFAgent.learning_rate = 0.0001
 BBFAgent.encoder_learning_rate = 0.0001
 BBFAgent.target_update_tau = 0.005

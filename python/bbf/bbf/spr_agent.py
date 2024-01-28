@@ -1000,7 +1000,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       target_eval_mode=False,
       offline_update_frac=0,
       summary_writer=None,
-      half_precision=False,
       log_churn=True,
       verbose=False,
       seed=None,
@@ -1066,8 +1065,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       offline_update_frac: float, fraction of a reset interval to do offline
         after each reset to warm-start the new network. summary_writer=None,
       summary_writer: SummaryWriter object, for outputting training statistics.
-      half_precision: bool, use fp16 in training. Doubles training throughput,
-        but may reduce final performance.
       log_churn: bool, log policy churn metrics.
       verbose: bool, also print metrics to stdout during training.
       seed: int, a seed for Jax RNG and initialization.
@@ -1162,16 +1159,8 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
                  str(jax.local_devices()))
 
     platform = jax.local_devices()[0].platform
-    if half_precision:
-      if platform == "tpu":
-        self.dtype = jnp.bfloat16
-        self.dtype_str = "bfloat16"
-      else:
-        self.dtype = jnp.float16
-        self.dtype_str = "float16"
-    else:
-      self.dtype = jnp.float32
-      self.dtype_str = "float32"
+    self.dtype = jnp.float32
+    self.dtype_str = "float32"
 
     logging.info("\t Running with dtype %s", str(self.dtype))
 
