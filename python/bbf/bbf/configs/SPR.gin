@@ -28,7 +28,6 @@ BBFAgent.data_augmentation = True
 BBFAgent.replay_scheme = 'prioritized'
 BBFAgent.half_precision = False
 BBFAgent.network    = @bbf.spr_networks.RainbowDQNNetwork
-BBFAgent.epsilon_fn = @jax.agents.dqn.dqn_agent.linearly_decaying_epsilon
 BBFAgent.learning_rate = 0.0001
 BBFAgent.encoder_learning_rate = 0.0001
 

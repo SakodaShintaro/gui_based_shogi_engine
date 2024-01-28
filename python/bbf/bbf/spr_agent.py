@@ -973,7 +973,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       update_horizon=10,
       max_update_horizon=None,
       min_gamma=None,
-      epsilon_fn=dqn_agent.linearly_decaying_epsilon,
       replay_scheme="uniform",
       replay_type="deterministic",
       reset_every=-1,
@@ -1033,9 +1032,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       update_horizon: int, n-step return length.
       max_update_horizon: int, n-step start point for annealing.
       min_gamma: float, gamma start point for annealing.
-      epsilon_fn: function expecting 4 parameters: (decay_period, step,
-        warmup_steps, epsilon). This function should return the epsilon value
-        used for exploration during training.
       replay_scheme: str, 'prioritized' or 'uniform', the sampling scheme of the
         replay memory.
       replay_type: str, 'deterministic' or 'regular', specifies the type of
@@ -1190,7 +1186,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
             num_atoms=self._num_atoms,
             dtype=self.dtype,
         ),
-        epsilon_fn=epsilon_fn,
+        epsilon_fn=dqn_agent.linearly_decaying_epsilon,
         target_update_period=self.target_update_period,
         update_horizon=self.max_update_horizon,
         summary_writer=summary_writer,

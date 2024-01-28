@@ -24,7 +24,6 @@ BBFAgent.replay_ratio = 32
 BBFAgent.batch_size = 32
 BBFAgent.replay_scheme = 'prioritized'
 BBFAgent.network    = @bbf.spr_networks.RainbowDQNNetwork
-BBFAgent.epsilon_fn = @jax.agents.dqn.dqn_agent.linearly_decaying_epsilon
 
 # Note these parameters are from DER (van Hasselt et al, 2019)
 bbf.agents.spr_agent.create_scaling_optimizer.learning_rate = 0.0001
