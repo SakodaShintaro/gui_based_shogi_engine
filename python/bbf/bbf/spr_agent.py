@@ -469,14 +469,13 @@ train_static_argnums = (
     0,
     3,
     14,
-    15,
-    17,
+    16,
+    18,
     19,
     20,
     21,
-    22,
+    25,
     26,
-    27,
 )
 train_donate_argnums = (1, 2, 4)
 
@@ -497,19 +496,18 @@ def train(
     support,  # 12
     cumulative_gamma,  # 13
     double_dqn,  # 14, static
-    distributional,  # 15, static
-    rng,  # 16
-    spr_weight,  # 17, static (gates rollouts)
-    dynamic_scale,  # 18
-    data_augmentation,  # 19, static
-    dtype,  # 20, static
-    batch_size,  # 21, static
-    use_target_backups,  # 22, static
-    target_update_tau,  # 23
-    target_update_every,  # 24
-    step,  # 25
-    match_online_target_rngs,  # 26, static
-    target_eval_mode,  # 27, static
+    rng,  # 15
+    spr_weight,  # 16, static (gates rollouts)
+    dynamic_scale,  # 17
+    data_augmentation,  # 18, static
+    dtype,  # 19, static
+    batch_size,  # 20, static
+    use_target_backups,  # 21, static
+    target_update_tau,  # 22
+    target_update_every,  # 23
+    step,  # 24
+    match_online_target_rngs,  # 25, static
+    target_eval_mode,  # 26, static
 ):
   """Run one or more training steps for BBF.
 
@@ -530,7 +528,6 @@ def train(
       (num_atoms,) array.
     cumulative_gamma: Discount factors (B,), gamma^n for the current n, gamma.
     double_dqn: Bool, whether to use double DQN.
-    distributional: Bool, whether to use C51.
     rng: JAX PRNG Key.
     spr_weight: SPR loss weight, float.
     dynamic_scale: Dynamic scale object, if mixed precision is used.
@@ -644,7 +641,7 @@ def train(
         spr_targets,
         loss_multipliers,
     ):
-      """Computes the distributional loss for C51 or huber loss for DQN."""
+      """Computes the distributional loss for C51."""
 
       def q_online(state, key, actions=None, do_rollout=False):
         return network_def.apply(
@@ -658,27 +655,18 @@ def train(
             mutable=["batch_stats"],
         )
 
-      if distributional:
-        (logits, spr_predictions, _) = get_logits(
-            q_online, current_state, actions[:, :-1], use_spr, batch_rngs
-        )
-        logits = jnp.squeeze(logits)
-        # Fetch the logits for its selected action. We use vmap to perform this
-        # indexing across the batch.
-        chosen_action_logits = jax.vmap(lambda x, y: x[y])(
-            logits, actions[:, 0]
-        )
-        dqn_loss = jax.vmap(losses.softmax_cross_entropy_loss_with_logits)(
-            target, chosen_action_logits)
-        td_error = dqn_loss + jnp.nan_to_num(target * jnp.log(target)).sum(-1)
-      else:
-        q_values, spr_predictions, _ = get_q_values(
-            q_online, current_state, actions[:, :-1], use_spr, batch_rngs
-        )
-        q_values = jnp.squeeze(q_values)
-        replay_chosen_q = jax.vmap(lambda x, y: x[y])(q_values, actions[:, 0])
-        dqn_loss = jax.vmap(losses.huber_loss)(target, replay_chosen_q)
-        td_error = dqn_loss
+      (logits, spr_predictions, _) = get_logits(
+          q_online, current_state, actions[:, :-1], use_spr, batch_rngs
+      )
+      logits = jnp.squeeze(logits)
+      # Fetch the logits for its selected action. We use vmap to perform this
+      # indexing across the batch.
+      chosen_action_logits = jax.vmap(lambda x, y: x[y])(
+          logits, actions[:, 0]
+      )
+      dqn_loss = jax.vmap(losses.softmax_cross_entropy_loss_with_logits)(
+          target, chosen_action_logits)
+      td_error = dqn_loss + jnp.nan_to_num(target * jnp.log(target)).sum(-1)
 
       if use_spr:
         spr_predictions = spr_predictions.transpose(1, 0, 2)
@@ -715,7 +703,6 @@ def train(
         support,
         cumulative_gamma,
         double_dqn,
-        distributional,
         use_target_backups,
         target_rng,
     )
@@ -850,7 +837,7 @@ def train(
 
 @functools.partial(
     jax.vmap,
-    in_axes=(None, None, 0, 0, 0, None, 0, None, None, None, 0),
+    in_axes=(None, None, 0, 0, 0, None, 0, None, None, 0),
     axis_name="batch",
 )
 def target_output(
@@ -862,7 +849,6 @@ def target_output(
     support,
     cumulative_gamma,
     double_dqn,
-    distributional,
     use_target_backups,
     rng,
 ):
@@ -883,18 +869,12 @@ def target_output(
   q_values = jnp.squeeze(select_dist.q_values)
   next_qt_argmax = jnp.argmax(q_values)
 
-  if distributional:
-    # Compute the target Q-value distribution
-    probabilities = jnp.squeeze(backup_dist.probabilities)
-    next_probabilities = probabilities[next_qt_argmax]
-    target_support = rewards + gamma_with_terminal * support
-    target = dopamine_rainbow_agent.project_distribution(
-        target_support, next_probabilities, support)
-  else:
-    # Compute the target Q-value
-    next_q_values = jnp.squeeze(backup_dist.q_values)
-    replay_next_qt_max = next_q_values[next_qt_argmax]
-    target = rewards + gamma_with_terminal * replay_next_qt_max
+  # Compute the target Q-value distribution
+  probabilities = jnp.squeeze(backup_dist.probabilities)
+  next_probabilities = probabilities[next_qt_argmax]
+  target_support = rewards + gamma_with_terminal * support
+  target = dopamine_rainbow_agent.project_distribution(
+      target_support, next_probabilities, support)
 
   return jax.lax.stop_gradient(target)
 
@@ -986,7 +966,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       self,
       num_actions,
       double_dqn=True,
-      distributional=True,
       data_augmentation=False,
       num_updates_per_train_step=1,
       network=spr_networks.RainbowDQNNetwork,
@@ -1041,7 +1020,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     Args:
       num_actions: int, number of actions the agent can take at any state.
       double_dqn: bool, Whether to use Double DQN or not.
-      distributional: bool, whether to use distributional RL or not.
       data_augmentation: bool, Whether to use data augmentation or not.
       num_updates_per_train_step: int, Number of gradient updates every training
         step. Defaults to 1.
@@ -1116,7 +1094,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self.__class__.__name__,
     )
     logging.info("\t double_dqn: %s", double_dqn)
-    logging.info("\t distributional: %s", distributional)
     logging.info("\t data_augmentation: %s", data_augmentation)
     logging.info("\t replay_scheme: %s", replay_scheme)
     logging.info("\t num_updates_per_train_step: %d",
@@ -1129,7 +1106,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self._replay_scheme = replay_scheme
     self._replay_type = replay_type
     self._double_dqn = bool(double_dqn)
-    self._distributional = bool(distributional)
     self._data_augmentation = bool(data_augmentation)
     self._replay_ratio = int(replay_ratio)
     self._batch_size = int(batch_size)
@@ -1222,7 +1198,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         network=functools.partial(
             network,
             num_atoms=self._num_atoms,
-            distributional=self._distributional,
             dtype=self.dtype,
         ),
         epsilon_fn=epsilon_fn,
@@ -1594,7 +1569,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self._support,
         self.replay_elements["discount"],
         self._double_dqn,
-        self._distributional,
         train_rng,
         self.spr_weight,
         self.dynamic_scale,

@@ -17,7 +17,6 @@ JaxDQNAgent.epsilon_decay_period = 2001    # DrQ
 JaxDQNAgent.optimizer = 'adam'
 
 BBFAgent.double_dqn = True
-BBFAgent.distributional = True
 BBFAgent.num_atoms = 51
 BBFAgent.reset_every = 5_000 # Change if you change the replay ratio
 BBFAgent.shrink_perturb_keys = "encoder,transition_model"

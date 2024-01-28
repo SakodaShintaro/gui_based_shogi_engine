@@ -376,12 +376,10 @@ class RainbowDQNNetwork(nn.Module):
   Attributes:
       num_actions: int, number of actions the agent can take at any state.
       num_atoms: int, the number of buckets of the value function distribution.
-      distributional: bool, whether to use distributional RL.
   """
 
   num_actions: int
   num_atoms: int
-  distributional: bool
   padding: Any = 'SAME'
   hidden_dim: int = 512
   width_scale: float = 1.0
@@ -481,12 +479,8 @@ class RainbowDQNNetwork(nn.Module):
     if do_rollout:
       spatial_latent = self.spr_rollout(spatial_latent, actions, key)
 
-    if self.distributional:
-      probabilities = jnp.squeeze(nn.softmax(logits))
-      q_values = jnp.squeeze(jnp.sum(support * probabilities, axis=-1))
-      return SPROutputType(
-          q_values, logits, probabilities, spatial_latent, representation
-      )
-
-    q_values = jnp.squeeze(logits)
-    return SPROutputType(q_values, None, None, spatial_latent, representation)
+    probabilities = jnp.squeeze(nn.softmax(logits))
+    q_values = jnp.squeeze(jnp.sum(support * probabilities, axis=-1))
+    return SPROutputType(
+        q_values, logits, probabilities, spatial_latent, representation
+    )
