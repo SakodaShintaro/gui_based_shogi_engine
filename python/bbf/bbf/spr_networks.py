@@ -121,48 +121,35 @@ class LinearHead(nn.Module):
 
   Attributes:
     advantage: Advantage layer.
-    value: Value layer (if dueling).
-    dueling: Bool, whether to use dueling networks.
+    value: Value layer.
     num_actions: int, size of action space.
     num_atoms: int, number of value prediction atoms per action.
     dtype: Jax dtype.
     initializer: Jax initializer.
   """
-  dueling: bool
   num_actions: int
   num_atoms: int
   dtype: Dtype = jnp.float32
   initializer: Any = nn.initializers.xavier_uniform()
 
   def setup(self):
-    if self.dueling:
-      self.advantage = FeatureLayer(
-          self.num_actions * self.num_atoms,
-          dtype=self.dtype,
-          initializer=self.initializer,
-      )
-      self.value = FeatureLayer(
-          self.num_atoms,
-          dtype=self.dtype,
-          initializer=self.initializer,
-      )
-    else:
-      self.advantage = FeatureLayer(
-          self.num_actions * self.num_atoms,
-          dtype=self.dtype,
-          initializer=self.initializer,
-      )
+    self.advantage = FeatureLayer(
+        self.num_actions * self.num_atoms,
+        dtype=self.dtype,
+        initializer=self.initializer,
+    )
+    self.value = FeatureLayer(
+        self.num_atoms,
+        dtype=self.dtype,
+        initializer=self.initializer,
+    )
 
   def __call__(self, x, key, eval_mode):
-    if self.dueling:
-      adv = self.advantage(x, key, eval_mode)
-      value = self.value(x, key, eval_mode)
-      adv = adv.reshape((self.num_actions, self.num_atoms))
-      value = value.reshape((1, self.num_atoms))
-      logits = value + (adv - (jnp.mean(adv, -2, keepdims=True)))
-    else:
-      x = self.advantage(x, key, eval_mode)
-      logits = x.reshape((self.num_actions, self.num_atoms))
+    adv = self.advantage(x, key, eval_mode)
+    value = self.value(x, key, eval_mode)
+    adv = adv.reshape((self.num_actions, self.num_atoms))
+    value = value.reshape((1, self.num_atoms))
+    logits = value + (adv - (jnp.mean(adv, -2, keepdims=True)))
     return logits
 
 
@@ -439,13 +426,11 @@ class RainbowDQNNetwork(nn.Module):
   Attributes:
       num_actions: int, number of actions the agent can take at any state.
       num_atoms: int, the number of buckets of the value function distribution.
-      dueling: bool, Whether to use dueling network architecture.
       distributional: bool, whether to use distributional RL.
   """
 
   num_actions: int
   num_atoms: int
-  dueling: bool
   distributional: bool
   renormalize: bool = False
   padding: Any = 'SAME'
@@ -486,7 +471,6 @@ class RainbowDQNNetwork(nn.Module):
     self.head = LinearHead(
         num_actions=self.num_actions,
         num_atoms=self.num_atoms,
-        dueling=self.dueling,
         dtype=jnp.float32,
         initializer=initializer,
     )

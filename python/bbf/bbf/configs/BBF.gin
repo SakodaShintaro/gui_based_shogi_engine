@@ -15,7 +15,6 @@ JaxDQNAgent.epsilon_eval = 0.001
 JaxDQNAgent.epsilon_decay_period = 2001    # DrQ
 JaxDQNAgent.optimizer = 'adam'
 
-BBFAgent.dueling = True
 BBFAgent.double_dqn = True
 BBFAgent.distributional = True
 BBFAgent.num_atoms = 51

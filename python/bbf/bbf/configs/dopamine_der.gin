@@ -1,5 +1,5 @@
 # Data Efficient Rainbow (DER) based on Dopamine Rainbow params.
-# Noisy nets, dueling and double DQN are disabled.
+# Noisy nets, double DQN are disabled.
 import dopamine.jax.networks
 import dopamine.discrete_domains.gym_lib
 import dopamine.discrete_domains.run_experiment
@@ -18,7 +18,6 @@ JaxDQNAgent.epsilon_eval = 0.001
 JaxDQNAgent.epsilon_decay_period = 2000    # agent steps
 JaxDQNAgent.optimizer = 'adam'
 
-BBFAgent.dueling = False
 BBFAgent.double_dqn = False
 BBFAgent.num_atoms = 51
 BBFAgent.vmax = 10.

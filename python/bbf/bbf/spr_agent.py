@@ -985,7 +985,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
   def __init__(
       self,
       num_actions,
-      dueling=True,
       double_dqn=True,
       distributional=True,
       data_augmentation=False,
@@ -1041,7 +1040,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
 
     Args:
       num_actions: int, number of actions the agent can take at any state.
-      dueling: bool, Whether to use dueling network architecture or not.
       double_dqn: bool, Whether to use Double DQN or not.
       distributional: bool, whether to use distributional RL or not.
       data_augmentation: bool, Whether to use data augmentation or not.
@@ -1118,7 +1116,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self.__class__.__name__,
     )
     logging.info("\t double_dqn: %s", double_dqn)
-    logging.info("\t dueling_dqn: %s", dueling)
     logging.info("\t distributional: %s", distributional)
     logging.info("\t data_augmentation: %s", data_augmentation)
     logging.info("\t replay_scheme: %s", replay_scheme)
@@ -1132,7 +1129,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self._replay_scheme = replay_scheme
     self._replay_type = replay_type
     self._double_dqn = bool(double_dqn)
-    self._dueling = bool(dueling)
     self._distributional = bool(distributional)
     self._data_augmentation = bool(data_augmentation)
     self._replay_ratio = int(replay_ratio)
@@ -1226,7 +1222,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         network=functools.partial(
             network,
             num_atoms=self._num_atoms,
-            dueling=self._dueling,
             distributional=self._distributional,
             dtype=self.dtype,
         ),

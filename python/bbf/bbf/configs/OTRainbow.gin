@@ -17,7 +17,6 @@ JaxDQNAgent.epsilon_eval = 0.001
 JaxDQNAgent.epsilon_decay_period = 50000    # OTRainbow (instead of 250000)
 JaxDQNAgent.optimizer = 'adam'
 
-BBFAgent.dueling = False
 BBFAgent.double_dqn = False
 BBFAgent.num_atoms = 51
 BBFAgent.replay_ratio = 256

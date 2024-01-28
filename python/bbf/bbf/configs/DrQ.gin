@@ -19,7 +19,6 @@ JaxDQNAgent.epsilon_eval = 0.001
 JaxDQNAgent.epsilon_decay_period = 2500    # DrQ
 JaxDQNAgent.optimizer = 'adam'
 
-BBFAgent.dueling = True
 BBFAgent.double_dqn = True
 BBFAgent.distributional = False    # DrQ (Efficient DQN)
 BBFAgent.num_atoms = 1    # Since DrQ uses DQN, rather than C51
