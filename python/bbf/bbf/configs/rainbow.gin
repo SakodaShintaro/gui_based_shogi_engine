@@ -21,7 +21,6 @@ BBFAgent.vmax = 10.
 BBFAgent.replay_ratio = 8
 BBFAgent.batch_size = 32
 BBFAgent.replay_scheme = 'prioritized'
-BBFAgent.network    = @bbf.spr_networks.RainbowDQNNetwork
 
 # Note these parameters are different from C51's.
 bbf.agents.spr_agent.create_scaling_optimizer.learning_rate = 0.0000625

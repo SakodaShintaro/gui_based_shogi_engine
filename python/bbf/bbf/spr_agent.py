@@ -961,7 +961,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       num_actions,
       data_augmentation=False,
       num_updates_per_train_step=1,
-      network=spr_networks.RainbowDQNNetwork,
       num_atoms=51,
       vmax=10.0,
       vmin=None,
@@ -1014,9 +1013,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       data_augmentation: bool, Whether to use data augmentation or not.
       num_updates_per_train_step: int, Number of gradient updates every training
         step. Defaults to 1.
-      network: flax.linen Module, neural network used by the agent initialized
-        by shape in _create_network below. See
-        dopamine.jax.networks.RainbowNetwork as an example.
       num_atoms: int, the number of buckets of the value function distribution.
       vmax: float, the value distribution support is [vmin, vmax].
       vmin: float, the value distribution support is [vmin, vmax]. If vmin is
@@ -1182,7 +1178,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     super().__init__(
         num_actions=num_actions,
         network=functools.partial(
-            network,
+            spr_networks.RainbowDQNNetwork,
             num_atoms=self._num_atoms,
             dtype=self.dtype,
         ),
