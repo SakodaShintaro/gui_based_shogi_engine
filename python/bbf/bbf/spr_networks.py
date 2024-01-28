@@ -19,15 +19,13 @@ import collections
 import enum
 import functools
 import time
-from typing import Any, Sequence, Tuple
+from typing import Any, Tuple
 
-from absl import logging
 from flax import linen as nn
 import gin
 import jax
 from jax import random
 import jax.numpy as jnp
-import numpy as onp
 
 
 SPROutputType = collections.namedtuple(
@@ -224,49 +222,6 @@ class ConvTMCell(nn.Module):
 
 
 @gin.configurable
-class SpatialLearnedEmbeddings(nn.Module):
-  """A learned spatial embedding class that can replace flattens or pooling.
-
-  Attributes:
-    num_features: Number of features to extract per channel.
-    param_dtype: Jax dtype.
-    use_bias: Whether the embeddings should have a bias term.
-    initializer: Jax initializer.
-  """
-  num_features: int = 8
-  param_dtype: Any = jnp.float32
-  use_bias: bool = True
-  initializer: Any = nn.initializers.xavier_uniform()
-
-  @nn.compact
-  def __call__(self, spatial_latent):
-    """features is B x H x W X C."""
-    height = spatial_latent.shape[-3]
-    width = spatial_latent.shape[-2]
-    channels = spatial_latent.shape[-1]
-    kernel = self.param(
-        'kernel',
-        self.initializer,
-        (height, width, channels, self.num_features),
-        self.param_dtype,
-    )
-    if self.use_bias:
-      bias = self.param(
-          'bias',
-          nn.initializers.zeros,
-          (channels * self.num_features,),
-          self.param_dtype,
-      )
-    else:
-      bias = 0
-
-    spatial_latent = jnp.expand_dims(spatial_latent, -1)
-    features = jnp.sum(spatial_latent * kernel, axis=(-4, -3))
-    features = features.reshape(*features.shape[:-2], -1) + bias
-    return features
-
-
-@gin.configurable
 class ImpalaCNN(nn.Module):
   """ResNet encoder based on Impala.
 
@@ -437,7 +392,6 @@ class RainbowDQNNetwork(nn.Module):
   hidden_dim: int = 512
   width_scale: float = 1.0
   dtype: Dtype = jnp.float32
-  use_spatial_learned_embeddings: bool = False
 
   def setup(self):
     initializer = nn.initializers.xavier_uniform()
@@ -456,9 +410,6 @@ class RainbowDQNNetwork(nn.Module):
         dtype=self.dtype,
         initializer=initializer,
     )
-
-    if self.use_spatial_learned_embeddings:
-      self.embedder = SpatialLearnedEmbeddings(initializer=initializer)
 
     self.projection = FeatureLayer(
         int(self.hidden_dim),
@@ -504,9 +455,7 @@ class RainbowDQNNetwork(nn.Module):
 
   def flatten_spatial_latent(self, spatial_latent, has_batch=False):
     # logging.info('Spatial latent shape: %s', str(spatial_latent.shape))
-    if self.use_spatial_learned_embeddings:
-      representation = self.embedder(spatial_latent)
-    elif has_batch:
+    if has_batch:
       representation = spatial_latent.reshape(spatial_latent.shape[0], -1)
     else:
       representation = spatial_latent.reshape(-1)
