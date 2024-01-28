@@ -40,12 +40,6 @@ Shape = Tuple[int]
 Dtype = Any
 
 
-class EncoderType(str, enum.Enum):
-  DQN = 'dqn'
-  IMPALA = 'impala'
-  RESNET = 'resnet'
-
-
 class InitializerType(str, enum.Enum):
   XAVIER_UNIFORM = 'xavier_uniform'
   KAIMING_UNIFORM = 'kaiming_uniform'
@@ -609,7 +603,6 @@ class RainbowDQNNetwork(nn.Module):
   distributional: bool
   renormalize: bool = False
   padding: Any = 'SAME'
-  encoder_type: str = 'dqn'
   hidden_dim: int = 512
   width_scale: float = 1.0
   dtype: Dtype = jnp.float32
@@ -632,31 +625,12 @@ class RainbowDQNNetwork(nn.Module):
           'Unsupported initializer: {}'.format(self.initializer_type)
       )
 
-    if self.encoder_type == EncoderType.DQN:
-      self.encoder = RainbowCNN(
-          padding=self.padding,
-          width_scale=self.width_scale,
-          dtype=self.dtype,
-          initializer=initializer,
-      )
-      latent_dim = self.encoder.dims[-1] * self.width_scale
-    elif self.encoder_type == EncoderType.IMPALA:
-      self.encoder = ImpalaCNN(
-          width_scale=self.width_scale,
-          dtype=self.dtype,
-          initializer=initializer,
-      )
-      latent_dim = self.encoder.dims[-1] * self.width_scale
-    elif self.encoder_type == EncoderType.RESNET:
-      self.encoder = ResNetEncoder(
-          width_scale=self.width_scale,
-          dtype=self.dtype,
-      )
-      latent_dim = (self.encoder.num_filters
-                    * self.width_scale
-                    * 2**(len(self.encoder.stage_sizes) - 1))
-    else:
-      raise NotImplementedError()
+    self.encoder = ImpalaCNN(
+        width_scale=self.width_scale,
+        dtype=self.dtype,
+        initializer=initializer,
+    )
+    latent_dim = self.encoder.dims[-1] * self.width_scale
 
     self.transition_model = TransitionModel(
         num_actions=self.num_actions,
