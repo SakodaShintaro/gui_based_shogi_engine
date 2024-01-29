@@ -40,18 +40,6 @@ from bbf import spr_networks
 from bbf.replay_memory import subsequence_replay_buffer
 
 
-def _pmap_device_order():
-  """Gets JAX's default device assignments as used in pmap."""
-  if jax.process_count() == 1:
-    return [
-        d
-        for d in xb.get_backend().local_devices()
-        if d.process_index == jax.process_index()
-    ]
-  else:
-    return jax.local_devices()
-
-
 def prefetch_to_device(iterator, size, devices=None, device_axis=False):
   """Shard and prefetch batches on device.
 
@@ -80,7 +68,11 @@ def prefetch_to_device(iterator, size, devices=None, device_axis=False):
     the specified devices.
   """
   queue = collections.deque()
-  devices = devices or _pmap_device_order()
+  devices = [
+      d
+      for d in xb.get_backend().local_devices()
+      if d.process_index == jax.process_index()
+  ]
   def map_select(i, data):
     return jax.tree_util.tree_map(lambda x: x[i], data)
 
