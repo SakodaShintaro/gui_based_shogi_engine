@@ -470,7 +470,6 @@ train_static_argnums = (
     17,
     18,
     19,
-    23,
 )
 train_donate_argnums = (1, 2, 4)
 
@@ -499,7 +498,6 @@ def train(
     target_update_tau,  # 20
     target_update_every,  # 21
     step,  # 22
-    target_eval_mode,  # 23, static
 ):
   """Run one or more training steps for BBF.
 
@@ -531,8 +529,6 @@ def train(
       hard (online target), 0 is frozen.
     target_update_every: How often to do a target update (in gradient steps).
     step: The current gradient step.
-    target_eval_mode: Whether to run the target network in eval mode (disabling
-      dropout).
 
   Returns:
     Updated online params, target params, optimizer state, dynamic scale,
@@ -604,7 +600,7 @@ def train(
           state,
           key=key,
           support=support,
-          eval_mode=target_eval_mode,
+          eval_mode=False,
           rngs={"dropout": key},
           mutable=["batch_stats"],
       )
@@ -976,7 +972,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       target_update_period=1,
       target_action_selection=False,
       use_target_network=True,
-      target_eval_mode=False,
       offline_update_frac=0,
       summary_writer=None,
       log_churn=True,
@@ -1032,8 +1027,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       use_target_network: bool, enable the target network in training. Subtly
         different from setting tau=1.0, as it allows action selection according
         to an EMA policy, allowing decoupled investigation.
-      target_eval_mode: bool, run target network in eval mode, disabling dropout
-        etc.
       offline_update_frac: float, fraction of a reset interval to do offline
         after each reset to warm-start the new network. summary_writer=None,
       summary_writer: SummaryWriter object, for outputting training statistics.
@@ -1092,7 +1085,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
 
     self.target_action_selection = target_action_selection
     self.use_target_network = use_target_network
-    self.target_eval_mode = target_eval_mode
 
     self.grad_steps = 0
     self.cycle_grad_steps = 0
@@ -1497,7 +1489,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self.target_update_tau_scheduler(self.cycle_grad_steps),
         self.target_update_period,
         self.grad_steps,
-        self.target_eval_mode,
     )
     self.grad_steps += self._batches_to_group
     self.cycle_grad_steps += self._batches_to_group
