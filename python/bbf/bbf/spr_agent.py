@@ -300,12 +300,6 @@ def jit_reset(
   return online_params, target_network_params, optimizer_state, random_params
 
 
-@gin.configurable
-def identity_epsilon(unused_decay_period, unused_step, unused_warmup_steps,
-                     epsilon):
-  return epsilon
-
-
 def exponential_decay_scheduler(
     decay_period, warmup_steps, initial_value, final_value, reverse=False
 ):
@@ -362,10 +356,9 @@ def tree_norm(tree):
   return jnp.sqrt(sum((x**2).sum() for x in jax.tree_util.tree_leaves(tree)))
 
 
-@functools.partial(jax.jit,
-                   static_argnames="num")
-def jit_split(rng, num=2):
-  return jax.random.split(rng, num)
+@functools.partial(jax.jit)
+def jit_split(rng):
+  return jax.random.split(rng, 2)
 
 
 @functools.partial(
@@ -471,7 +464,6 @@ train_static_argnums = (
     18,
     19,
 )
-train_donate_argnums = (1, 2, 4)
 
 
 def train(
@@ -1118,7 +1110,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     logging.info("\t Found following local devices: %s",
                  str(jax.local_devices()))
 
-    platform = jax.local_devices()[0].platform
     self.dtype = jnp.float32
     self.dtype_str = "float32"
 
@@ -1458,7 +1449,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
           use_noise=False,
       )
 
-    self._rng, train_rng = jit_split(self._rng, num=2)
+    self._rng, train_rng = jit_split(self._rng)
     (
         new_online_params,
         new_target_params,
