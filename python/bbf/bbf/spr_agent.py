@@ -191,7 +191,6 @@ def interpolate_weights(
 @functools.partial(
     jax.jit,
     static_argnames=(
-        "do_rollout",
         "state_shape",
         "keys_to_copy",
         "shrink_perturb_keys",
@@ -208,7 +207,6 @@ def jit_reset(
     optimizer,
     rng,
     state_shape,
-    do_rollout,
     support,
     reset_target,
     shrink_perturb_keys,
@@ -245,7 +243,7 @@ def jit_reset(
   random_params = network_def.init(
       x=state,
       actions=actions,
-      do_rollout=do_rollout,
+      do_rollout=True,
       rngs={
           "params": online_rng,
           "dropout": rng
@@ -255,7 +253,7 @@ def jit_reset(
   target_random_params = network_def.init(
       x=state,
       actions=actions,
-      do_rollout=do_rollout,
+      do_rollout=True,
       rngs={
           "params": target_rng,
           "dropout": rng
@@ -468,13 +466,12 @@ def get_spr_targets(model, states, key):
 train_static_argnums = (
     0,
     3,
-    15,
+    16,
     17,
     18,
     19,
-    20,
+    23,
     24,
-    25,
 )
 train_donate_argnums = (1, 2, 4)
 
@@ -495,17 +492,16 @@ def train(
     support,  # 12
     cumulative_gamma,  # 13
     rng,  # 14
-    spr_weight,  # 15, static (gates rollouts)
-    dynamic_scale,  # 16
-    data_augmentation,  # 19, static
-    dtype,  # 20, static
-    batch_size,  # 21, static
-    use_target_backups,  # 22, static
-    target_update_tau,  # 23
-    target_update_every,  # 24
-    step,  # 25
-    match_online_target_rngs,  # 26, static
-    target_eval_mode,  # 27, static
+    dynamic_scale,  # 15
+    data_augmentation,  # 16, static
+    dtype,  # 17, static
+    batch_size,  # 18, static
+    use_target_backups,  # 19, static
+    target_update_tau,  # 20
+    target_update_every,  # 21
+    step,  # 22
+    match_online_target_rngs,  # 23, static
+    target_eval_mode,  # 24, static
 ):
   """Run one or more training steps for BBF.
 
@@ -526,7 +522,6 @@ def train(
       (num_atoms,) array.
     cumulative_gamma: Discount factors (B,), gamma^n for the current n, gamma.
     rng: JAX PRNG Key.
-    spr_weight: SPR loss weight, float.
     dynamic_scale: Dynamic scale object, if mixed precision is used.
     data_augmentation: Bool, whether to apply data augmentation.
     dtype: Jax dtype for training (float32, float16, or bfloat16)
@@ -597,7 +592,6 @@ def train(
       target_rng = batch_rngs
     else:
       target_rng = jax.random.split(rng1, num=states.shape[0])
-    use_spr = spr_weight > 0
 
     def q_online(state, key, actions=None, do_rollout=False):
       return network_def.apply(
@@ -653,7 +647,7 @@ def train(
         )
 
       (logits, spr_predictions, _) = get_logits(
-          q_online, current_state, actions[:, :-1], use_spr, batch_rngs
+          q_online, current_state, actions[:, :-1], True, batch_rngs
       )
       logits = jnp.squeeze(logits)
       # Fetch the logits for its selected action. We use vmap to perform this
@@ -665,17 +659,15 @@ def train(
           target, chosen_action_logits)
       td_error = dqn_loss + jnp.nan_to_num(target * jnp.log(target)).sum(-1)
 
-      if use_spr:
-        spr_predictions = spr_predictions.transpose(1, 0, 2)
-        spr_predictions = spr_predictions / jnp.linalg.norm(
-            spr_predictions, 2, -1, keepdims=True)
-        spr_targets = spr_targets / jnp.linalg.norm(
-            spr_targets, 2, -1, keepdims=True)
-        spr_loss = jnp.power(spr_predictions - spr_targets, 2).sum(-1)
-        spr_loss = (spr_loss * same_traj_mask.transpose(1, 0)).mean(0)
-      else:
-        spr_loss = 0
+      spr_predictions = spr_predictions.transpose(1, 0, 2)
+      spr_predictions = spr_predictions / jnp.linalg.norm(
+          spr_predictions, 2, -1, keepdims=True)
+      spr_targets = spr_targets / jnp.linalg.norm(
+          spr_targets, 2, -1, keepdims=True)
+      spr_loss = jnp.power(spr_predictions - spr_targets, 2).sum(-1)
+      spr_loss = (spr_loss * same_traj_mask.transpose(1, 0)).mean(0)
 
+      spr_weight = 5
       loss = dqn_loss + spr_weight * spr_loss
       loss = loss_multipliers * loss
 
@@ -704,12 +696,9 @@ def train(
     )
     target = jax.lax.stop_gradient(target)
 
-    if use_spr:
-      future_states = states[:, 1:]
-      spr_targets = get_spr_targets(encode_project, future_states, target_rng)
-      spr_targets = spr_targets.transpose(1, 0, 2)
-    else:
-      spr_targets = None
+    future_states = states[:, 1:]
+    spr_targets = get_spr_targets(encode_project, future_states, target_rng)
+    spr_targets = spr_targets.transpose(1, 0, 2)
 
     # Get the unweighted loss without taking its mean for updating priorities.
 
@@ -965,7 +954,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       vmax=10.0,
       vmin=None,
       jumps=0,
-      spr_weight=0,
       batch_size=32,
       replay_ratio=64,
       batches_to_group=1,
@@ -1016,8 +1004,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       vmin: float, the value distribution support is [vmin, vmax]. If vmin is
         None, it is set to -vmax.
       jumps: int, number of steps to predict in SPR.
-      spr_weight: float, weight of the SPR loss (in the format of Schwarzer et
-        al's code, not their paper, so 5.0 is default.)
       batch_size: number of examples per batch.
       replay_ratio: Average number of times an example is replayed during
         training. Divide by batch_size to get the 'replay ratio' definition
@@ -1086,7 +1072,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self._batches_to_group = int(batches_to_group)
     self.update_horizon = int(update_horizon)
     self._jumps = int(jumps)
-    self.spr_weight = spr_weight
     self.log_every = int(log_every)
     self.verbose = verbose
     self.log_churn = log_churn
@@ -1200,7 +1185,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self.online_params = self.network_def.init(
         x=self.state.astype(self.dtype),
         actions=actions,
-        do_rollout=self.spr_weight > 0,
+        do_rollout=True,
         rngs={
             "params": rng,
             "dropout": rng
@@ -1392,12 +1377,10 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     keys_to_copy = []
     if not self.reset_projection:
       keys_to_copy.append("projection")
-      if self.spr_weight > 0:
-        keys_to_copy.append("predictor")
+      keys_to_copy.append("predictor")
     if not self.reset_encoder:
       keys_to_copy.append("encoder")
-      if self.spr_weight > 0:
-        keys_to_copy.append("transition_model")
+      keys_to_copy.append("transition_model")
     if not self.reset_head:
       keys_to_copy += ["head"]
     keys_to_copy = tuple(keys_to_copy)
@@ -1417,7 +1400,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self.optimizer,
         reset_rng,
         self.state_shape,
-        self.spr_weight > 0,
         self._support,
         self.reset_target,
         self.shrink_perturb_keys,
@@ -1519,7 +1501,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self._support,
         self.replay_elements["discount"],
         train_rng,
-        self.spr_weight,
         self.dynamic_scale,
         self._data_augmentation,
         self.dtype,

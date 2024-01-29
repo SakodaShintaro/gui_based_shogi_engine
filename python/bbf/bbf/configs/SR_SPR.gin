@@ -26,7 +26,6 @@ BBFAgent.log_every = 100
 BBFAgent.replay_ratio = 256
 BBFAgent.batches_to_group = 8
 BBFAgent.batch_size = 32
-BBFAgent.spr_weight = 5
 BBFAgent.jumps = 5
 BBFAgent.data_augmentation = True
 BBFAgent.learning_rate = 0.0001
