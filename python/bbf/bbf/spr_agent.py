@@ -174,9 +174,11 @@ def interpolate_weights(
   combined_params = {}
   if keys is None:
     keys = old_params.keys()
+
+  old_params = FrozenDict(old_params)
+  new_params = FrozenDict(new_params)
+
   for k in keys:
-    old_params = FrozenDict(old_params)
-    new_params = FrozenDict(new_params)
     combined_params[k] = jax.tree_util.tree_map(combination, old_params[k],
                                                 new_params[k])
   for k, v in old_params.items():
