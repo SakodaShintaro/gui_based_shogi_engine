@@ -471,7 +471,6 @@ train_static_argnums = (
     18,
     19,
     23,
-    24,
 )
 train_donate_argnums = (1, 2, 4)
 
@@ -500,8 +499,7 @@ def train(
     target_update_tau,  # 20
     target_update_every,  # 21
     step,  # 22
-    match_online_target_rngs,  # 23, static
-    target_eval_mode,  # 24, static
+    target_eval_mode,  # 23, static
 ):
   """Run one or more training steps for BBF.
 
@@ -533,8 +531,6 @@ def train(
       hard (online target), 0 is frozen.
     target_update_every: How often to do a target update (in gradient steps).
     step: The current gradient step.
-    match_online_target_rngs: whether to use the same RNG for online and target
-      networks, to sync dropout etc.
     target_eval_mode: Whether to run the target network in eval mode (disabling
       dropout).
 
@@ -588,10 +584,7 @@ def train(
     rng, rng1, rng2 = jax.random.split(rng, num=3)
 
     batch_rngs = jax.random.split(rng, num=states.shape[0])
-    if match_online_target_rngs:
-      target_rng = batch_rngs
-    else:
-      target_rng = jax.random.split(rng1, num=states.shape[0])
+    target_rng = batch_rngs
 
     def q_online(state, key, actions=None, do_rollout=False):
       return network_def.apply(
@@ -983,7 +976,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       target_update_period=1,
       target_action_selection=False,
       use_target_network=True,
-      match_online_target_rngs=True,
       target_eval_mode=False,
       offline_update_frac=0,
       summary_writer=None,
@@ -1040,9 +1032,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       use_target_network: bool, enable the target network in training. Subtly
         different from setting tau=1.0, as it allows action selection according
         to an EMA policy, allowing decoupled investigation.
-      match_online_target_rngs: bool, use the same JAX prng key for both online
-        and target networks during training. Guarantees that dropout is aligned
-        between the two networks.
       target_eval_mode: bool, run target network in eval mode, disabling dropout
         etc.
       offline_update_frac: float, fraction of a reset interval to do offline
@@ -1103,7 +1092,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
 
     self.target_action_selection = target_action_selection
     self.use_target_network = use_target_network
-    self.match_online_target_rngs = match_online_target_rngs
     self.target_eval_mode = target_eval_mode
 
     self.grad_steps = 0
@@ -1509,7 +1497,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self.target_update_tau_scheduler(self.cycle_grad_steps),
         self.target_update_period,
         self.grad_steps,
-        self.match_online_target_rngs,
         self.target_eval_mode,
     )
     self.grad_steps += self._batches_to_group
