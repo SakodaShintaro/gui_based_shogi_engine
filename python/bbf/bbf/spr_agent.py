@@ -40,7 +40,7 @@ from bbf import spr_networks
 from bbf.replay_memory import subsequence_replay_buffer
 
 
-def prefetch_to_device(iterator, size, device_axis=False):
+def prefetch_to_device(iterator, size):
   """Shard and prefetch batches on device.
 
   This utility takes an iterator and returns a new iterator which fills an on
@@ -58,8 +58,6 @@ def prefetch_to_device(iterator, size, device_axis=False):
     size: the size of the prefetch buffer.  If you're training on GPUs, 2 is
       generally the best choice because this guarantees that you can overlap a
       training step on GPU with a data prefetch step on CPU.
-    device_axis: Whether or not to have a device axis. False will only place the
-      data on the first device.
 
   Yields:
     The original items from the iterator where each ndarray is now a sharded to
@@ -81,16 +79,9 @@ def prefetch_to_device(iterator, size, device_axis=False):
       list_data.append(map_select(i, data))
     return list_data
 
-  if not device_axis:
-    def enqueue(n):
-      for data in itertools.islice(iterator, n):
-        queue.append(jax.device_put(data, device=jax.local_devices()[0]))
-
-  else:
-
-    def enqueue(n):  # Enqueues *up to* `n` elements from the iterator.
-      for data in itertools.islice(iterator, n):
-        queue.append(jax.device_put_sharded(_shard(data), devices))
+  def enqueue(n):
+    for data in itertools.islice(iterator, n):
+      queue.append(jax.device_put(data, device=jax.local_devices()[0]))
 
   enqueue(size)  # Fill up the buffer.
   while queue:
