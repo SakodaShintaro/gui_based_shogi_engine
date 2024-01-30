@@ -158,7 +158,6 @@ def interpolate_weights(
         "state_shape",
         "keys_to_copy",
         "shrink_perturb_keys",
-        "reset_target",
         "network_def",
         "optimizer",
     ),
@@ -172,7 +171,6 @@ def jit_reset(
     rng,
     state_shape,
     support,
-    reset_target,
     shrink_perturb_keys,
     shrink_factor,
     perturb_factor,
@@ -191,7 +189,6 @@ def jit_reset(
     do_rollout: Whether to do a dynamics model rollout (e.g., if SPR is being
       used).
     support: Support of the categorical distribution if using distributional RL.
-    reset_target: Whether to also reset the target network.
     shrink_perturb_keys: Parameter keys to apply shrink-and-perturb to.
     shrink_factor: Factor to rescale current weights by (1 keeps , 0 deletes).
     perturb_factor: Factor to scale random noise by in [0, 1].
@@ -248,18 +245,17 @@ def jit_reset(
     updated_optim_state.append(optim_state[i]._replace(**optim_to_copy))
   optimizer_state = tuple(updated_optim_state)
 
-  if reset_target:
-    if shrink_perturb_keys:
-      target_network_params = interpolate_weights(
-          target_network_params,
-          target_random_params,
-          shrink_perturb_keys,
-          old_weight=shrink_factor,
-          new_weight=perturb_factor,
-      )
-    target_network_params = copy_params(
-        target_network_params, target_random_params, keys=keys_to_copy)
-    target_network_params = FrozenDict(target_network_params)
+  if shrink_perturb_keys:
+    target_network_params = interpolate_weights(
+        target_network_params,
+        target_random_params,
+        shrink_perturb_keys,
+        old_weight=shrink_factor,
+        new_weight=perturb_factor,
+    )
+  target_network_params = copy_params(
+      target_network_params, target_random_params, keys=keys_to_copy)
+  target_network_params = FrozenDict(target_network_params)
 
   return online_params, target_network_params, optimizer_state, random_params
 
@@ -888,12 +884,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       head_warmup=0,
       learning_rate=0.0001,
       encoder_learning_rate=0.0001,
-      reset_target=True,
-      reset_head=True,
-      reset_projection=True,
-      reset_encoder=False,
-      reset_priorities=False,
-      reset_interval_scaling=None,
       shrink_perturb_keys="",
       perturb_factor=0.2,  # original was 0.1
       shrink_factor=0.8,  # original was 0.4
@@ -938,13 +928,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       head_warmup: warmup steps for head optimizer.
       learning_rate: Learning rate for all non-encoder parameters.
       encoder_learning_rate: Learning rate for the encoder (if different).
-      reset_target: bool, whether to reset target network on resets.
-      reset_head: bool, whether to reset head on resets.
-      reset_projection: bool, whether to reset penultimate layer on resets.
-      reset_encoder: bool, whether to reset encoder on resets.
-      reset_priorities: bool, whether to reset priorities in replay buffer.
-      reset_interval_scaling: Optional float, ratio by which to increase reset
-        interval at each reset.
       shrink_perturb_keys: string of comma-separated keys, such as
         'encoder,transition_model', to which to apply shrink & perturb to.
       perturb_factor: float, weight of random noise in shrink & perturb.
@@ -988,15 +971,9 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self.log_churn = log_churn
 
     self.reset_every = int(reset_every)
-    self.reset_target = reset_target
-    self.reset_head = reset_head
-    self.reset_projection = reset_projection
-    self.reset_encoder = reset_encoder
-    self.reset_priorities = reset_priorities
     self.offline_update_frac = float(offline_update_frac)
     self.no_resets_after = int(no_resets_after)
     self.cumulative_resets = 0
-    self.reset_interval_scaling = reset_interval_scaling
     self.reset_offset = int(reset_offset)
     self.next_reset = self.reset_every + self.reset_offset
 
@@ -1245,23 +1222,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
 
   def reset_weights(self):
     self.cumulative_resets += 1
-    if self.reset_interval_scaling is None or not self.reset_interval_scaling:
-      interval = self.reset_every
-    elif str(self.reset_interval_scaling).lower() == "linear":
-      interval = self.reset_every * (1 + self.cumulative_resets)
-    elif "epoch" in str(self.reset_interval_scaling):
-      epochs = float(self.reset_interval_scaling.replace("epochs:", ""))
-      steps = (
-          epochs * self._replay.num_elements() /
-          (self._batch_size * self._num_updates_per_train_step *
-           self._batches_to_group))
-      interval = int(steps) + self.reset_every
-    elif isinstance(self.reset_interval_scaling, float) or "." in str(
-        self.reset_interval_scaling):
-      interval = self.reset_every * float(self.reset_interval_scaling)**(
-          self.cumulative_resets)
-    else:
-      raise NotImplementedError()
+    interval = self.reset_every
 
     self.next_reset = int(interval) + self.training_steps
     if self.next_reset > self.no_resets_after + self.reset_offset:
@@ -1280,18 +1241,10 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     # These are the parameter entries that will be copied over unchanged
     # from the current dictionary to the new (randomly-initialized) one
     keys_to_copy = []
-    if not self.reset_projection:
-      keys_to_copy.append("projection")
-      keys_to_copy.append("predictor")
-    if not self.reset_encoder:
-      keys_to_copy.append("encoder")
-      keys_to_copy.append("transition_model")
-    if not self.reset_head:
-      keys_to_copy += ["head"]
+    keys_to_copy.append("encoder")
+    keys_to_copy.append("transition_model")
     keys_to_copy = tuple(keys_to_copy)
 
-    if self.reset_priorities:
-      self._replay.reset_priorities()
     (
         self.online_params,
         self.target_network_params,
@@ -1306,7 +1259,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         reset_rng,
         self.state_shape,
         self._support,
-        self.reset_target,
         self.shrink_perturb_keys,
         self.shrink_factor,
         self.perturb_factor,
