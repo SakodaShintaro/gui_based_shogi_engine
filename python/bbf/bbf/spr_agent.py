@@ -40,7 +40,7 @@ from bbf import spr_networks
 from bbf.replay_memory import subsequence_replay_buffer
 
 
-def prefetch_to_device(iterator, size, devices=None, device_axis=False):
+def prefetch_to_device(iterator, size, device_axis=False):
   """Shard and prefetch batches on device.
 
   This utility takes an iterator and returns a new iterator which fills an on
@@ -58,8 +58,6 @@ def prefetch_to_device(iterator, size, devices=None, device_axis=False):
     size: the size of the prefetch buffer.  If you're training on GPUs, 2 is
       generally the best choice because this guarantees that you can overlap a
       training step on GPU with a data prefetch step on CPU.
-    devices: the list of devices to which the arrays should be prefetched.
-      Defaults to the order of devices expected by `jax.pmap`.
     device_axis: Whether or not to have a device axis. False will only place the
       data on the first device.
 
