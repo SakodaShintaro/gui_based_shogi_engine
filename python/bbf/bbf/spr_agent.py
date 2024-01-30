@@ -64,20 +64,6 @@ def prefetch_to_device(iterator, size):
     the specified devices.
   """
   queue = collections.deque()
-  devices = [
-      d
-      for d in xb.get_backend().local_devices()
-      if d.process_index == jax.process_index()
-  ]
-  def map_select(i, data):
-    return jax.tree_util.tree_map(lambda x: x[i], data)
-
-  @jax.jit
-  def _shard(data):
-    list_data = []
-    for i in range(len(devices)):
-      list_data.append(map_select(i, data))
-    return list_data
 
   def enqueue(n):
     for data in itertools.islice(iterator, n):
@@ -87,11 +73,6 @@ def prefetch_to_device(iterator, size):
   while queue:
     yield queue.popleft()
     enqueue(1)
-
-
-def copy_within_frozen_tree(old, new, prefix):
-  new_entry = old[prefix].copy(add_or_replace=new)
-  return old.copy(add_or_replace={prefix: new_entry})
 
 
 def copy_params(source, target, keys=("encoder", "transition_model")):
