@@ -809,81 +809,56 @@ def target_output(
 
 @gin.configurable
 def create_scaling_optimizer(
-    name="adam",
     learning_rate=6.25e-5,
     beta1=0.9,
     beta2=0.999,
     eps=1.5e-4,
-    centered=False,
     warmup=0,
     weight_decay=0.0,
-    decay_bias=False,
 ):
   """Create an optimizer for training.
 
-  Currently, only the Adam and RMSProp optimizers are supported.
+  Currently, only the Adam optimizer is supported.
 
   Args:
-    name: str, name of the optimizer to create.
     learning_rate: float, learning rate to use in the optimizer.
     beta1: float, beta1 parameter for the optimizer.
     beta2: float, beta2 parameter for the optimizer.
     eps: float, epsilon parameter for the optimizer.
-    centered: bool, centered parameter for RMSProp.
     warmup: int, warmup steps for learning rate.
     weight_decay: float, weight decay parameter for AdamW.
-    decay_bias: bool, also apply weight decay to bias (rank 1) parameters.
 
   Returns:
     A flax optimizer.
   """
-  if name == "adam":
-    logging.info(
-        ("Creating AdamW optimizer with settings lr=%f, beta1=%f, "
-         "beta2=%f, eps=%f, wd=%f"),
+  logging.info(
+      ("Creating AdamW optimizer with settings lr=%f, beta1=%f, "
+        "beta2=%f, eps=%f, wd=%f"),
+      learning_rate,
+      beta1,
+      beta2,
+      eps,
+      weight_decay,
+  )
+  mask = lambda p: jax.tree_util.tree_map(lambda x: x.ndim != 1, p)
+  if warmup == 0:
+    return optax.adamw(
         learning_rate,
-        beta1,
-        beta2,
-        eps,
-        weight_decay,
-    )
-    if decay_bias:
-      mask = lambda p: True
-    else:
-      mask = lambda p: jax.tree_util.tree_map(lambda x: x.ndim != 1, p)
-    if warmup == 0:
-      return optax.adamw(
-          learning_rate,
-          b1=beta1,
-          b2=beta2,
-          eps=eps,
-          weight_decay=weight_decay,
-          mask=mask,
-      )
-    schedule = optax.linear_schedule(0, learning_rate, warmup)
-    return optax.inject_hyperparams(optax.adamw)(
-        learning_rate=schedule,
         b1=beta1,
         b2=beta2,
         eps=eps,
         weight_decay=weight_decay,
         mask=mask,
     )
-  elif name == "rmsprop":
-    logging.info(
-        "Creating RMSProp optimizer with settings lr=%f, beta2=%f, eps=%f",
-        learning_rate,
-        beta2,
-        eps,
-    )
-    if warmup == 0:
-      return optax.rmsprop(
-          learning_rate, decay=beta2, eps=eps, centered=centered)
-    schedule = optax.linear_schedule(0, learning_rate, warmup)
-    return optax.inject_hyperparams(optax.rmsprop)(
-        learning_rate=schedule, decay=beta2, eps=eps, centered=centered)
-  else:
-    raise ValueError("Unsupported optimizer {}".format(name))
+  schedule = optax.linear_schedule(0, learning_rate, warmup)
+  return optax.inject_hyperparams(optax.adamw)(
+      learning_rate=schedule,
+      b1=beta1,
+      b2=beta2,
+      eps=eps,
+      weight_decay=weight_decay,
+      mask=mask,
+  )
 
 
 @gin.configurable
@@ -1125,12 +1100,10 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         support=self._support,
     )
     optimizer = create_scaling_optimizer(
-        self._optimizer_name,
         warmup=self.head_warmup,
         learning_rate=self.learning_rate,
     )
     encoder_optimizer = create_scaling_optimizer(
-        self._optimizer_name,
         warmup=self.encoder_warmup,
         learning_rate=self.encoder_learning_rate,
     )
