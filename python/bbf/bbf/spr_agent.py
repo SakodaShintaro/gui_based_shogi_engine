@@ -926,7 +926,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       max_target_update_tau=None,
       cycle_steps=0,
       target_update_period=1,
-      target_action_selection=False,
       use_target_network=True,
       offline_update_frac=0,
       summary_writer=None,
@@ -979,7 +978,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       max_target_update_tau: float, highest value of tau for annealing cycles.
       cycle_steps: int, number of steps to anneal hyperparameters after reset.
       target_update_period: int, steps per target network update.
-      target_action_selection: bool, act according to the target network.
       use_target_network: bool, enable the target network in training. Subtly
         different from setting tau=1.0, as it allows action selection according
         to an EMA policy, allowing decoupled investigation.
@@ -1039,7 +1037,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self.shrink_factor = shrink_factor
     self.perturb_factor = perturb_factor
 
-    self.target_action_selection = target_action_selection
     self.use_target_network = use_target_network
 
     self.grad_steps = 0
@@ -1692,18 +1689,12 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     """
     if not self.eval_mode:
       self._train_step()
-    state = self.state
-
-    use_target = self.target_action_selection
-    select_params = (
-        self.target_network_params if use_target else self.online_params)
-    use_noise = not self.eval_mode
 
     action = self.select_action(
-        state,
-        select_params,
+        self.state,
+        self.target_network_params,
         eval_mode=self.eval_mode,
-        use_noise=use_noise,
+        use_noise=not self.eval_mode,
     )
     self.action = onp.asarray(action)
     return self.action
