@@ -422,7 +422,6 @@ train_static_argnums = (
     16,
     17,
     18,
-    19,
 )
 
 
@@ -446,10 +445,9 @@ def train(
     data_augmentation,  # 16, static
     dtype,  # 17, static
     batch_size,  # 18, static
-    use_target_backups,  # 19, static
-    target_update_tau,  # 20
-    target_update_every,  # 21
-    step,  # 22
+    target_update_tau,  # 19
+    target_update_every,  # 20
+    step,  # 21
 ):
   """Run one or more training steps for BBF.
 
@@ -476,7 +474,6 @@ def train(
     batch_size: int, size of each batch to run. Must cleanly divide the leading
       axis of input arrays. If smaller, the function will chain together
       multiple batches.
-    use_target_backups: Bool, use target network for backups.
     target_update_tau: Float in [0, 1], tau for target network updates. 1 is
       hard (online target), 0 is frozen.
     target_update_every: How often to do a target update (in gradient steps).
@@ -632,7 +629,6 @@ def train(
         terminals,
         support,
         cumulative_gamma,
-        use_target_backups,
         target_rng,
     )
     target = jax.lax.stop_gradient(target)
@@ -763,7 +759,7 @@ def train(
 
 @functools.partial(
     jax.vmap,
-    in_axes=(None, None, 0, 0, 0, None, 0, None, 0),
+    in_axes=(None, None, 0, 0, 0, None, 0, 0),
     axis_name="batch",
 )
 def target_output(
@@ -774,7 +770,6 @@ def target_output(
     terminals,
     support,
     cumulative_gamma,
-    use_target_backups,
     rng,
 ):
   """Builds the C51 target distribution or DQN target Q-values."""
@@ -782,19 +777,15 @@ def target_output(
   # Incorporate terminal state to discount factor.
   gamma_with_terminal = cumulative_gamma * is_terminal_multiplier
 
-  if use_target_backups:
-    target_dist, _ = target_network(next_states, key=rng)
+  target_dist, _ = target_network(next_states, key=rng)
   online_dist, _ = model(next_states, key=rng)
 
-  backup_dist = target_dist if use_target_backups else online_dist
-  # Double DQN uses the current network for the action selection
-  select_dist = online_dist
   # Action selection using Q-values for next-state
-  q_values = jnp.squeeze(select_dist.q_values)
+  q_values = jnp.squeeze(online_dist.q_values)
   next_qt_argmax = jnp.argmax(q_values)
 
   # Compute the target Q-value distribution
-  probabilities = jnp.squeeze(backup_dist.probabilities)
+  probabilities = jnp.squeeze(target_dist.probabilities)
   next_probabilities = probabilities[next_qt_argmax]
   target_support = rewards + gamma_with_terminal * support
   target = dopamine_rainbow_agent.project_distribution(
@@ -891,7 +882,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       max_target_update_tau=None,
       cycle_steps=0,
       target_update_period=1,
-      use_target_network=True,
       offline_update_frac=0,
       summary_writer=None,
       log_churn=True,
@@ -936,9 +926,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       max_target_update_tau: float, highest value of tau for annealing cycles.
       cycle_steps: int, number of steps to anneal hyperparameters after reset.
       target_update_period: int, steps per target network update.
-      use_target_network: bool, enable the target network in training. Subtly
-        different from setting tau=1.0, as it allows action selection according
-        to an EMA policy, allowing decoupled investigation.
       offline_update_frac: float, fraction of a reset interval to do offline
         after each reset to warm-start the new network. summary_writer=None,
       summary_writer: SummaryWriter object, for outputting training statistics.
@@ -988,8 +975,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self.shrink_perturb_keys = tuple(self.shrink_perturb_keys)
     self.shrink_factor = shrink_factor
     self.perturb_factor = perturb_factor
-
-    self.use_target_network = use_target_network
 
     self.grad_steps = 0
     self.cycle_grad_steps = 0
@@ -1362,7 +1347,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self._data_augmentation,
         self.dtype,
         self._batch_size,
-        self.use_target_network,
         self.target_update_tau_scheduler(self.cycle_grad_steps),
         self.target_update_period,
         self.grad_steps,
