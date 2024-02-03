@@ -793,7 +793,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       replay_type="deterministic",
       reset_every=-1,
       no_resets_after=-1,
-      reset_offset=1,
       learning_rate=0.0001,
       encoder_learning_rate=0.0001,
       shrink_perturb_keys="",
@@ -826,7 +825,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         replay buffer to create.
       reset_every: int, how many training steps between resets. 0 to disable.
       no_resets_after: int, training step to cease resets before.
-      reset_offset: offset to initial reset.
       learning_rate: Learning rate for all non-encoder parameters.
       encoder_learning_rate: Learning rate for the encoder (if different).
       shrink_perturb_keys: string of comma-separated keys, such as
@@ -865,8 +863,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self.offline_update_frac = float(offline_update_frac)
     self.no_resets_after = int(no_resets_after)
     self.cumulative_resets = 0
-    self.reset_offset = int(reset_offset)
-    self.next_reset = self.reset_every + self.reset_offset
+    self.next_reset = self.reset_every + 1
 
     self.learning_rate = learning_rate
     self.encoder_learning_rate = encoder_learning_rate
@@ -1078,7 +1075,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     interval = self.reset_every
 
     self.next_reset = int(interval) + self.training_steps
-    if self.next_reset > self.no_resets_after + self.reset_offset:
+    if self.next_reset > self.no_resets_after + 1:
       logging.info(
           "\t Not resetting at step %s, as need at least"
           " %s before %s to recover.",
