@@ -885,7 +885,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       offline_update_frac=0,
       summary_writer=None,
       log_churn=True,
-      verbose=False,
       seed=None,
   ):
     """Initializes the agent and constructs the necessary components.
@@ -929,7 +928,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         after each reset to warm-start the new network. summary_writer=None,
       summary_writer: SummaryWriter object, for outputting training statistics.
       log_churn: bool, log policy churn metrics.
-      verbose: bool, also print metrics to stdout during training.
       seed: int, a seed for Jax RNG and initialization.
     """
     logging.info(
@@ -952,7 +950,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self.update_horizon = int(update_horizon)
     self._jumps = int(jumps)
     self.log_every = 100
-    self.verbose = verbose
     self.log_churn = log_churn
 
     self.reset_every = int(reset_every)
@@ -1421,8 +1418,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         with self.summary_writer.as_default():
           for k, v in metrics.items():
             tf.summary.scalar(f"Agent/{k}", v, step=self.training_steps)
-      if self.verbose:
-        logging.info(str(metrics))
 
     self.target_network_params = new_target_params
     self.online_params = new_online_params
