@@ -790,7 +790,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       update_horizon=10,
       max_update_horizon=None,
       min_gamma=None,
-      replay_type="deterministic",
       reset_every=-1,
       no_resets_after=-1,
       learning_rate=0.0001,
@@ -821,8 +820,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       update_horizon: int, n-step return length.
       max_update_horizon: int, n-step start point for annealing.
       min_gamma: float, gamma start point for annealing.
-      replay_type: str, 'deterministic' or 'regular', specifies the type of
-        replay buffer to create.
       reset_every: int, how many training steps between resets. 0 to disable.
       no_resets_after: int, training step to cease resets before.
       learning_rate: Learning rate for all non-encoder parameters.
@@ -851,7 +848,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     vmax = 10.0
     vmin = -vmax
     self._support = jnp.linspace(vmin, vmax, num_atoms)
-    self._replay_type = replay_type
     self._replay_ratio = int(replay_ratio)
     self._batch_size = int(batch_size)
     self._batches_to_group = int(batches_to_group)
@@ -998,8 +994,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
 
   def _build_replay_buffer(self):
     """Creates the replay buffer used by the agent."""
-    if self._replay_type not in ["deterministic"]:
-      raise ValueError("Invalid replay type: {}".format(self._replay_type))
     buffer = subsequence_replay_buffer.PrioritizedJaxSubsequenceParallelEnvReplayBuffer(
         observation_shape=self.observation_shape,
         stack_size=self.stack_size,
