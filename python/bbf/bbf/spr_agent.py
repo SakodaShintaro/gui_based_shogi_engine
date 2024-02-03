@@ -457,8 +457,7 @@ def train(
     terminals: Terminal signals, (B, T).
     same_traj_mask: Mask denoting valid continuations of trajectories, (B, T).
     loss_weights: Loss weights from prioritized replay sampling, (B,).
-    support: support for the categorical distribution in C51, if used.
-      (num_atoms,) array.
+    support: support for the categorical distribution in C51
     cumulative_gamma: Discount factors (B,), gamma^n for the current n, gamma.
     rng: JAX PRNG Key.
     dtype: Jax dtype for training (float32, float16, or bfloat16)
@@ -784,9 +783,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       self,
       num_actions,
       num_updates_per_train_step=1,
-      num_atoms=51,
-      vmax=10.0,
-      vmin=None,
       jumps=0,
       batch_size=32,
       replay_ratio=64,
@@ -817,10 +813,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       num_actions: int, number of actions the agent can take at any state.
       num_updates_per_train_step: int, Number of gradient updates every training
         step. Defaults to 1.
-      num_atoms: int, the number of buckets of the value function distribution.
-      vmax: float, the value distribution support is [vmin, vmax].
-      vmin: float, the value distribution support is [vmin, vmax]. If vmin is
-        None, it is set to -vmax.
       jumps: int, number of steps to predict in SPR.
       batch_size: number of examples per batch.
       replay_ratio: Average number of times an example is replayed during
@@ -857,10 +849,10 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     logging.info("\t num_updates_per_train_step: %d",
                  num_updates_per_train_step)
     # We need casting because passing arguments can convert ints to floats
-    vmax = float(vmax)
-    self._num_atoms = int(num_atoms)
-    vmin = float(vmin) if vmin else -vmax
-    self._support = jnp.linspace(vmin, vmax, self._num_atoms)
+    num_atoms=51
+    vmax = 10.0
+    vmin = -vmax
+    self._support = jnp.linspace(vmin, vmax, num_atoms)
     self._replay_type = replay_type
     self._replay_ratio = int(replay_ratio)
     self._batch_size = int(batch_size)
@@ -923,7 +915,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         num_actions=num_actions,
         network=functools.partial(
             spr_networks.RainbowDQNNetwork,
-            num_atoms=self._num_atoms,
+            num_atoms=num_atoms,
             dtype=self.dtype,
         ),
         epsilon_fn=dqn_agent.linearly_decaying_epsilon,

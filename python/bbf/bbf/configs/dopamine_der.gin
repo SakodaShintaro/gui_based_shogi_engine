@@ -18,8 +18,6 @@ JaxDQNAgent.epsilon_eval = 0.001
 JaxDQNAgent.epsilon_decay_period = 2000    # agent steps
 JaxDQNAgent.optimizer = 'adam'
 
-BBFAgent.num_atoms = 51
-BBFAgent.vmax = 10.
 BBFAgent.replay_ratio = 32
 BBFAgent.batch_size = 32
 
