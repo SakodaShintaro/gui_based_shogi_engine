@@ -884,7 +884,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       target_update_period=1,
       offline_update_frac=0,
       summary_writer=None,
-      log_churn=True,
       seed=None,
   ):
     """Initializes the agent and constructs the necessary components.
@@ -927,7 +926,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       offline_update_frac: float, fraction of a reset interval to do offline
         after each reset to warm-start the new network. summary_writer=None,
       summary_writer: SummaryWriter object, for outputting training statistics.
-      log_churn: bool, log policy churn metrics.
       seed: int, a seed for Jax RNG and initialization.
     """
     logging.info(
@@ -950,7 +948,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self.update_horizon = int(update_horizon)
     self._jumps = int(jumps)
     self.log_every = 100
-    self.log_churn = log_churn
 
     self.reset_every = int(reset_every)
     self.offline_update_frac = float(offline_update_frac)
@@ -1292,7 +1289,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     loss_weights /= onp.max(loss_weights)
     indices = self.replay_elements["indices"]
 
-    if self.log_churn and should_log:
+    if should_log:
       eval_batch = self.sample_eval_batch(256)
       eval_states = eval_batch["state"].reshape(-1,
                                                 *eval_batch["state"].shape[-3:])
@@ -1380,36 +1377,35 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
           "Set priority time": float(prio_set_time) / self._batches_to_group,
       }
 
-      if self.log_churn:
-        new_actions = self.select_action(
-            eval_states,
-            new_online_params,
-            eval_mode=True,
-            force_zero_eps=True,
-            rng=eval_rng,
-            use_noise=False,
-        )
-        new_target_actions = self.select_action(
-            eval_states,
-            new_target_params,
-            eval_mode=True,
-            force_zero_eps=True,
-            rng=eval_rng,
-            use_noise=False,
-        )
-        online_churn = onp.mean(new_actions != og_actions)
-        target_churn = onp.mean(new_target_actions != og_target_actions)
-        online_off_policy_frac = onp.mean(new_actions != eval_actions)
-        target_off_policy_frac = onp.mean(new_target_actions != eval_actions)
-        online_target_agreement = onp.mean(new_actions == new_target_actions)
-        churn_metrics = {
-            "Online Churn": online_churn,
-            "Target Churn": target_churn,
-            "Online-Target Agreement": online_target_agreement,
-            "Online Off-Policy Rate": online_off_policy_frac,
-            "Target Off-Policy Rate": target_off_policy_frac,
-        }
-        metrics.update(**churn_metrics)
+      new_actions = self.select_action(
+          eval_states,
+          new_online_params,
+          eval_mode=True,
+          force_zero_eps=True,
+          rng=eval_rng,
+          use_noise=False,
+      )
+      new_target_actions = self.select_action(
+          eval_states,
+          new_target_params,
+          eval_mode=True,
+          force_zero_eps=True,
+          rng=eval_rng,
+          use_noise=False,
+      )
+      online_churn = onp.mean(new_actions != og_actions)
+      target_churn = onp.mean(new_target_actions != og_target_actions)
+      online_off_policy_frac = onp.mean(new_actions != eval_actions)
+      target_off_policy_frac = onp.mean(new_target_actions != eval_actions)
+      online_target_agreement = onp.mean(new_actions == new_target_actions)
+      churn_metrics = {
+          "Online Churn": online_churn,
+          "Target Churn": target_churn,
+          "Online-Target Agreement": online_target_agreement,
+          "Online Off-Policy Rate": online_off_policy_frac,
+          "Target Off-Policy Rate": target_off_policy_frac,
+      }
+      metrics.update(**churn_metrics)
 
       if self.dynamic_scale:
         metrics["Dynamic Scale"] = self.dynamic_scale.scale
