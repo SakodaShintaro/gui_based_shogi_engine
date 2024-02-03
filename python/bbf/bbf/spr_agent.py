@@ -27,10 +27,8 @@ from dopamine.jax.agents.dqn import dqn_agent
 from dopamine.jax.agents.rainbow import rainbow_agent as dopamine_rainbow_agent
 from dopamine.replay_memory import prioritized_replay_buffer
 from flax.core.frozen_dict import FrozenDict
-from flax.training import dynamic_scale as dynamic_scale_lib
 import gin
 import jax
-import jax.lib.xla_bridge as xb
 import jax.numpy as jnp
 import numpy as onp
 import optax
@@ -419,8 +417,8 @@ def get_spr_targets(model, states, key):
 train_static_argnums = (
     0,
     3,
+    15,
     16,
-    17,
 )
 
 
@@ -440,12 +438,11 @@ def train(
     support,  # 12
     cumulative_gamma,  # 13
     rng,  # 14
-    dynamic_scale,  # 15
-    dtype,  # 16, static
-    batch_size,  # 17, static
-    target_update_tau,  # 18
-    target_update_every,  # 19
-    step,  # 20
+    dtype,  # 15, static
+    batch_size,  # 16, static
+    target_update_tau,  # 17
+    target_update_every,  # 18
+    step,  # 19
 ):
   """Run one or more training steps for BBF.
 
@@ -466,7 +463,6 @@ def train(
       (num_atoms,) array.
     cumulative_gamma: Discount factors (B,), gamma^n for the current n, gamma.
     rng: JAX PRNG Key.
-    dynamic_scale: Dynamic scale object, if mixed precision is used.
     dtype: Jax dtype for training (float32, float16, or bfloat16)
     batch_size: int, size of each batch to run. Must cleanly divide the leading
       axis of input arrays. If smaller, the function will chain together
@@ -491,7 +487,6 @@ def train(
         online_params,
         target_params,
         optimizer_state,
-        dynamic_scale,
         rng,
         step,
     ) = state
@@ -636,27 +631,13 @@ def train(
 
     # Get the unweighted loss without taking its mean for updating priorities.
 
-    if dynamic_scale:
-      grad_fn = dynamic_scale.value_and_grad(loss_fn, has_aux=True)
-      (
-          dynamic_scale,
-          is_fin,
-          (_, aux_losses),
-          grad,
-      ) = grad_fn(
-          online_params,
-          target,
-          spr_targets,
-          loss_weights,
-      )
-    else:
-      grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
-      (_, aux_losses), grad = grad_fn(
-          online_params,
-          target,
-          spr_targets,
-          loss_weights,
-      )
+    grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
+    (_, aux_losses), grad = grad_fn(
+        online_params,
+        target,
+        spr_targets,
+        loss_weights,
+    )
 
     grad_norm = tree_norm(grad)
     aux_losses["GradNorm"] = grad_norm
@@ -664,20 +645,8 @@ def train(
         grad, optimizer_state, params=online_params)
     new_online_params = optax.apply_updates(online_params, updates)
 
-    if dynamic_scale:
-      # if is_fin == False the gradients contain Inf/NaNs and state and
-      # params should be restored (= skip this step).
-      optimizer_state = jax.tree_util.tree_map(
-          functools.partial(jnp.where, is_fin),
-          new_optimizer_state,
-          optimizer_state,
-      )
-      online_params = jax.tree_util.tree_map(
-          functools.partial(jnp.where, is_fin), new_online_params,
-          online_params)
-    else:
-      optimizer_state = new_optimizer_state
-      online_params = new_online_params
+    optimizer_state = new_optimizer_state
+    online_params = new_online_params
 
     target_update_step = functools.partial(
         interpolate_weights,
@@ -698,7 +667,6 @@ def train(
             online_params,
             target_params,
             optimizer_state,
-            dynamic_scale,
             rng2,
             step + 1,
         ),
@@ -709,7 +677,6 @@ def train(
       online_params,
       target_params,
       optimizer_state,
-      dynamic_scale,
       rng,
       step,
   )
@@ -738,7 +705,6 @@ def train(
           online_params,
           target_params,
           optimizer_state,
-          dynamic_scale,
           rng,
           step,
       ),
@@ -749,7 +715,6 @@ def train(
       online_params,
       target_params,
       optimizer_state,
-      dynamic_scale,
       {k: jnp.reshape(v, (-1,)) for k, v in aux_losses.items()},
   )
 
@@ -994,10 +959,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
                  str(jax.local_devices()))
 
     self.dtype = jnp.float32
-    self.dtype_str = "float32"
-
-    logging.info("\t Running with dtype %s", str(self.dtype))
-
     super().__init__(
         num_actions=num_actions,
         network=functools.partial(
@@ -1087,11 +1048,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self.optimizer_state = jax.device_put(
         self.optimizer_state, jax.local_devices()[0]
     )
-
-    if self.dtype == jnp.float16:
-      self.dynamic_scale = dynamic_scale_lib.DynamicScale()
-    else:
-      self.dynamic_scale = None
 
   def _build_replay_buffer(self):
     """Creates the replay buffer used by the agent."""
@@ -1310,7 +1266,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         new_online_params,
         new_target_params,
         new_optimizer_state,
-        new_dynamic_scale,
         aux_losses,
     ) = self.train_fn(
         self.network_def,
@@ -1328,7 +1283,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self._support,
         self.replay_elements["discount"],
         train_rng,
-        self.dynamic_scale,
         self.dtype,
         self._batch_size,
         self.target_update_tau_scheduler(self.cycle_grad_steps),
@@ -1399,9 +1353,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       }
       metrics.update(**churn_metrics)
 
-      if self.dynamic_scale:
-        metrics["Dynamic Scale"] = self.dynamic_scale.scale
-
       if self.summary_writer is not None:
         with self.summary_writer.as_default():
           for k, v in metrics.items():
@@ -1410,7 +1361,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self.target_network_params = new_target_params
     self.online_params = new_online_params
     self.optimizer_state = new_optimizer_state
-    self.dynamic_scale = new_dynamic_scale
 
   def _store_transition(
       self,
