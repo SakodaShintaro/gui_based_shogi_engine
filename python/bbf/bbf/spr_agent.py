@@ -760,46 +760,14 @@ def create_scaling_optimizer(
     beta1=0.9,
     beta2=0.999,
     eps=1.5e-4,
-    warmup=0,
     weight_decay=0.0,
 ):
-  """Create an optimizer for training.
-
-  Currently, only the Adam optimizer is supported.
-
-  Args:
-    learning_rate: float, learning rate to use in the optimizer.
-    beta1: float, beta1 parameter for the optimizer.
-    beta2: float, beta2 parameter for the optimizer.
-    eps: float, epsilon parameter for the optimizer.
-    warmup: int, warmup steps for learning rate.
-    weight_decay: float, weight decay parameter for AdamW.
-
-  Returns:
-    A flax optimizer.
-  """
   logging.info(
-      ("Creating AdamW optimizer with settings lr=%f, beta1=%f, "
-        "beta2=%f, eps=%f, wd=%f"),
-      learning_rate,
-      beta1,
-      beta2,
-      eps,
-      weight_decay,
-  )
+      f"Creating AdamW optimizer with settings lr={learning_rate}, beta1={beta1}, "
+      f"beta2={beta2}, eps={eps}, wd={weight_decay}")
   mask = lambda p: jax.tree_util.tree_map(lambda x: x.ndim != 1, p)
-  if warmup == 0:
-    return optax.adamw(
-        learning_rate,
-        b1=beta1,
-        b2=beta2,
-        eps=eps,
-        weight_decay=weight_decay,
-        mask=mask,
-    )
-  schedule = optax.linear_schedule(0, learning_rate, warmup)
-  return optax.inject_hyperparams(optax.adamw)(
-      learning_rate=schedule,
+  return optax.adamw(
+      learning_rate,
       b1=beta1,
       b2=beta2,
       eps=eps,
@@ -830,8 +798,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       reset_every=-1,
       no_resets_after=-1,
       reset_offset=1,
-      encoder_warmup=0,
-      head_warmup=0,
       learning_rate=0.0001,
       encoder_learning_rate=0.0001,
       shrink_perturb_keys="",
@@ -869,8 +835,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       reset_every: int, how many training steps between resets. 0 to disable.
       no_resets_after: int, training step to cease resets before.
       reset_offset: offset to initial reset.
-      encoder_warmup: warmup steps for encoder optimizer.
-      head_warmup: warmup steps for head optimizer.
       learning_rate: Learning rate for all non-encoder parameters.
       encoder_learning_rate: Learning rate for the encoder (if different).
       shrink_perturb_keys: string of comma-separated keys, such as
@@ -912,8 +876,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self.reset_offset = int(reset_offset)
     self.next_reset = self.reset_every + self.reset_offset
 
-    self.encoder_warmup = int(encoder_warmup)
-    self.head_warmup = int(head_warmup)
     self.learning_rate = learning_rate
     self.encoder_learning_rate = encoder_learning_rate
 
@@ -1006,11 +968,9 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         support=self._support,
     )
     optimizer = create_scaling_optimizer(
-        warmup=self.head_warmup,
         learning_rate=self.learning_rate,
     )
     encoder_optimizer = create_scaling_optimizer(
-        warmup=self.encoder_warmup,
         learning_rate=self.encoder_learning_rate,
     )
 
