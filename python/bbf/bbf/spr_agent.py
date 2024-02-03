@@ -418,7 +418,6 @@ train_static_argnums = (
     0,
     3,
     15,
-    16,
 )
 
 
@@ -438,11 +437,10 @@ def train(
     support,  # 12
     cumulative_gamma,  # 13
     rng,  # 14
-    dtype,  # 15, static
-    batch_size,  # 16, static
-    target_update_tau,  # 17
-    target_update_every,  # 18
-    step,  # 19
+    batch_size,  # 15, static
+    target_update_tau,  # 16
+    target_update_every,  # 17
+    step,  # 18
 ):
   """Run one or more training steps for BBF.
 
@@ -507,13 +505,13 @@ def train(
 
     rng, rng1, rng2 = jax.random.split(rng, num=3)
     states = spr_networks.process_inputs(
-        raw_states, rng=rng1, data_augmentation=True, dtype=dtype
+        raw_states, rng=rng1, data_augmentation=True, dtype=jnp.float32
     )
     next_states = spr_networks.process_inputs(
         raw_next_states[:, 0],
         rng=rng2,
         data_augmentation=True,
-        dtype=dtype,
+        dtype=jnp.float32,
     )
     current_state = states[:, 0]
 
@@ -1283,7 +1281,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self._support,
         self.replay_elements["discount"],
         train_rng,
-        self.dtype,
         self._batch_size,
         self.target_update_tau_scheduler(self.cycle_grad_steps),
         self.target_update_period,

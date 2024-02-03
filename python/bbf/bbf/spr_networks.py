@@ -151,7 +151,7 @@ class LinearHead(nn.Module):
     return logits
 
 
-def process_inputs(x, data_augmentation, rng=None, dtype=jnp.float32):
+def process_inputs(x, data_augmentation, rng, dtype):
   """Input normalization and if specified, data augmentation."""
 
   if dtype == 'float32':
