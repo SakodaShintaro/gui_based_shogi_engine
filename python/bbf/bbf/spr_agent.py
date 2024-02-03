@@ -421,7 +421,6 @@ train_static_argnums = (
     3,
     16,
     17,
-    18,
 )
 
 
@@ -442,12 +441,11 @@ def train(
     cumulative_gamma,  # 13
     rng,  # 14
     dynamic_scale,  # 15
-    data_augmentation,  # 16, static
-    dtype,  # 17, static
-    batch_size,  # 18, static
-    target_update_tau,  # 19
-    target_update_every,  # 20
-    step,  # 21
+    dtype,  # 16, static
+    batch_size,  # 17, static
+    target_update_tau,  # 18
+    target_update_every,  # 19
+    step,  # 20
 ):
   """Run one or more training steps for BBF.
 
@@ -469,7 +467,6 @@ def train(
     cumulative_gamma: Discount factors (B,), gamma^n for the current n, gamma.
     rng: JAX PRNG Key.
     dynamic_scale: Dynamic scale object, if mixed precision is used.
-    data_augmentation: Bool, whether to apply data augmentation.
     dtype: Jax dtype for training (float32, float16, or bfloat16)
     batch_size: int, size of each batch to run. Must cleanly divide the leading
       axis of input arrays. If smaller, the function will chain together
@@ -515,12 +512,12 @@ def train(
 
     rng, rng1, rng2 = jax.random.split(rng, num=3)
     states = spr_networks.process_inputs(
-        raw_states, rng=rng1, data_augmentation=data_augmentation, dtype=dtype
+        raw_states, rng=rng1, data_augmentation=True, dtype=dtype
     )
     next_states = spr_networks.process_inputs(
         raw_next_states[:, 0],
         rng=rng2,
-        data_augmentation=data_augmentation,
+        data_augmentation=True,
         dtype=dtype,
     )
     current_state = states[:, 0]
@@ -855,7 +852,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
   def __init__(
       self,
       num_actions,
-      data_augmentation=False,
       num_updates_per_train_step=1,
       num_atoms=51,
       vmax=10.0,
@@ -890,7 +886,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
 
     Args:
       num_actions: int, number of actions the agent can take at any state.
-      data_augmentation: bool, Whether to use data augmentation or not.
       num_updates_per_train_step: int, Number of gradient updates every training
         step. Defaults to 1.
       num_atoms: int, the number of buckets of the value function distribution.
@@ -932,7 +927,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         "Creating %s agent with the following parameters:",
         self.__class__.__name__,
     )
-    logging.info("\t data_augmentation: %s", data_augmentation)
     logging.info("\t num_updates_per_train_step: %d",
                  num_updates_per_train_step)
     # We need casting because passing arguments can convert ints to floats
@@ -941,7 +935,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     vmin = float(vmin) if vmin else -vmax
     self._support = jnp.linspace(vmin, vmax, self._num_atoms)
     self._replay_type = replay_type
-    self._data_augmentation = bool(data_augmentation)
     self._replay_ratio = int(replay_ratio)
     self._batch_size = int(batch_size)
     self._batches_to_group = int(batches_to_group)
@@ -1336,7 +1329,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self.replay_elements["discount"],
         train_rng,
         self.dynamic_scale,
-        self._data_augmentation,
         self.dtype,
         self._batch_size,
         self.target_update_tau_scheduler(self.cycle_grad_steps),

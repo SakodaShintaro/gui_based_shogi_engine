@@ -22,7 +22,6 @@ JaxDQNAgent.optimizer = 'adam'
 BBFAgent.num_atoms = 1    # Since DrQ uses DQN, rather than C51
 BBFAgent.replay_ratio = 32
 BBFAgent.batch_size = 32
-BBFAgent.data_augmentation = True
 BBFAgent.target_update_period = 1    # DrQ (rather than 8000)
 
 # Note these parameters are from DER (van Hasselt et al, 2019)
