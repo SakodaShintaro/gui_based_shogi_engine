@@ -798,7 +798,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       perturb_factor=0.2,  # original was 0.1
       shrink_factor=0.8,  # original was 0.4
       target_update_tau=1.0,
-      max_target_update_tau=None,
       cycle_steps=0,
       target_update_period=1,
       offline_update_frac=0,
@@ -829,7 +828,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       perturb_factor: float, weight of random noise in shrink & perturb.
       shrink_factor: float, weight of initial parameters in shrink & perturb.
       target_update_tau: float, update parameter for EMA target network.
-      max_target_update_tau: float, highest value of tau for annealing cycles.
       cycle_steps: int, number of steps to anneal hyperparameters after reset.
       target_update_period: int, steps per target network update.
       offline_update_frac: float, fraction of a reset interval to do offline
@@ -886,18 +884,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       )
       self.update_horizon_scheduler = lambda x: int(  # pylint: disable=g-long-lambda
           onp.round(n_schedule(x) * self.max_update_horizon)
-      )
-
-    if max_target_update_tau is None:
-      self.max_target_update_tau = target_update_tau
-      self.target_update_tau_scheduler = lambda x: self.target_update_tau
-    else:
-      self.max_target_update_tau = max_target_update_tau
-      self.target_update_tau_scheduler = exponential_decay_scheduler(
-          cycle_steps,
-          0,
-          self.max_target_update_tau,
-          self.target_update_tau,
       )
 
     logging.info("\t Found following local devices: %s",
@@ -994,7 +980,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
 
   def _build_replay_buffer(self):
     """Creates the replay buffer used by the agent."""
-    buffer = subsequence_replay_buffer.PrioritizedJaxSubsequenceParallelEnvReplayBuffer(
+    return subsequence_replay_buffer.PrioritizedJaxSubsequenceParallelEnvReplayBuffer(
         observation_shape=self.observation_shape,
         stack_size=self.stack_size,
         update_horizon=self.max_update_horizon,
@@ -1003,9 +989,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         batch_size=self._batch_size,
         observation_dtype=self.observation_dtype,
     )
-
-    self.start = time.time()
-    return buffer
 
   def set_replay_settings(self):
     logging.info(f"\t batch size {self._batch_size} and replay ratio {self._replay_ratio}")
@@ -1139,9 +1122,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     should_log = (
         self.training_steps % self.log_every == 0 and not offline and
         step_index == 0)
-    interbatch_time = time.time() - self.start
-    self.start = time.time()
-    train_start = time.time()
 
     if not hasattr(self, "replay_elements"):
       self._sample_from_replay_buffer()
@@ -1202,7 +1182,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         self.replay_elements["discount"],
         train_rng,
         self._batch_size,
-        self.target_update_tau_scheduler(self.cycle_grad_steps),
+        self.target_update_tau,
         self.target_update_period,
         self.grad_steps,
     )
@@ -1210,11 +1190,8 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self.cycle_grad_steps += self._batches_to_group
 
     # Sample asynchronously while we wait for training
-    sample_start = time.time()
     self._sample_from_replay_buffer()
-    sample_time = time.time() - sample_start
 
-    prio_set_start = time.time()
     # Rainbow and prioritized replay are parametrized by an exponent
     # alpha, but in both cases it is set to 0.5 - for simplicity's sake we
     # leave it as is here, using the more direct sqrt(). Taking the square
@@ -1226,18 +1203,11 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     dqn_loss = onp.reshape(onp.asarray(aux_losses["DQNLoss"]), (-1))
     priorities = onp.sqrt(dqn_loss + 1e-10)
     self._replay.set_priority(indices, priorities)
-    prio_set_time = time.time() - prio_set_start
 
-    training_time = time.time() - train_start
-    if (self.training_steps % self.log_every == 0 and not offline and
-        step_index == 0):
+    if should_log:
       metrics = {
           **{k: onp.mean(v) for k, v in aux_losses.items()},
           "PNorm": float(tree_norm(new_online_params)),
-          "Inter-batch time": float(interbatch_time) / self._batches_to_group,
-          "Training time": float(training_time) / self._batches_to_group,
-          "Sampling time": float(sample_time) / self._batches_to_group,
-          "Set priority time": float(prio_set_time) / self._batches_to_group,
       }
 
       new_actions = self.select_action(
