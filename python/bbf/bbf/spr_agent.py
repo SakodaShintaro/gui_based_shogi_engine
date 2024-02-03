@@ -1013,40 +1013,17 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
         observation_dtype=self.observation_dtype,
     )
 
-    self.n_envs = 1
     self.start = time.time()
     return buffer
 
   def set_replay_settings(self):
-    logging.info(
-        "\t Operating with %s environments, batch size %s and replay ratio %s",
-        self.n_envs, self._batch_size, self._replay_ratio)
-    self._num_updates_per_train_step = max(
-        1, self._replay_ratio * self.n_envs // self._batch_size)
-    self.update_period = max(
-        1, self._batch_size // self._replay_ratio * self.n_envs
-    )
-    logging.info(
-        "\t Calculated %s updates per update phase",
-        self._num_updates_per_train_step,
-    )
-    logging.info(
-        "\t Calculated update frequency of %s step%s",
-        self.update_period,
-        "s" if self.update_period > 1 else "",
-    )
-    logging.info(
-        "\t Setting min_replay_history to %s from %s",
-        self.min_replay_history / self.n_envs,
-        self.min_replay_history,
-    )
-    logging.info(
-        "\t Setting epsilon_decay_period to %s from %s",
-        self.epsilon_decay_period / self.n_envs,
-        self.epsilon_decay_period,
-    )
-    self.min_replay_history = self.min_replay_history / self.n_envs
-    self.epsilon_decay_period = self.epsilon_decay_period / self.n_envs
+    logging.info(f"\t batch size {self._batch_size} and replay ratio {self._replay_ratio}")
+    self._num_updates_per_train_step = max(1, self._replay_ratio // self._batch_size)
+    self.update_period = max(1, self._batch_size // self._replay_ratio)
+    logging.info(f"\t Calculated {self._num_updates_per_train_step} updates per update phase")
+    logging.info(f"\t Calculated update frequency of {self.update_period} steps")
+    logging.info(f"\t Setting min_replay_history to {self.min_replay_history}")
+    logging.info(f"\t Setting epsilon_decay_period to {self.epsilon_decay_period}")
     self._batches_to_group = min(self._batches_to_group,
                                  self._num_updates_per_train_step)
     assert self._num_updates_per_train_step % self._batches_to_group == 0
