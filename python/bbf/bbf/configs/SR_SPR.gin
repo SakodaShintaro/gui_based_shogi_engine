@@ -22,7 +22,6 @@ BBFAgent.shrink_perturb_keys = "encoder,transition_model"
 BBFAgent.shrink_factor = 0.8
 BBFAgent.perturb_factor = 0.2
 BBFAgent.no_resets_after = 100_000 # Need to change if training longer
-BBFAgent.log_every = 100
 BBFAgent.replay_ratio = 256
 BBFAgent.batches_to_group = 8
 BBFAgent.batch_size = 32

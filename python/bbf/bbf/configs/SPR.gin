@@ -19,7 +19,6 @@ JaxDQNAgent.optimizer = 'adam'
 
 BBFAgent.num_atoms = 51
 BBFAgent.update_horizon = 10    # DrQ (instead of 3)
-BBFAgent.log_every = 100
 BBFAgent.replay_ratio = 64
 BBFAgent.batch_size = 32
 BBFAgent.jumps = 5

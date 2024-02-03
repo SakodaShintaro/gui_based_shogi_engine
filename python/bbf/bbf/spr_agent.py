@@ -887,7 +887,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       log_churn=True,
       verbose=False,
       seed=None,
-      log_every=100,
   ):
     """Initializes the agent and constructs the necessary components.
 
@@ -932,7 +931,6 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
       log_churn: bool, log policy churn metrics.
       verbose: bool, also print metrics to stdout during training.
       seed: int, a seed for Jax RNG and initialization.
-      log_every: int, training steps between metric logging calls.
     """
     logging.info(
         "Creating %s agent with the following parameters:",
@@ -953,7 +951,7 @@ class BBFAgent(dqn_agent.JaxDQNAgent):
     self._batches_to_group = int(batches_to_group)
     self.update_horizon = int(update_horizon)
     self._jumps = int(jumps)
-    self.log_every = int(log_every)
+    self.log_every = 100
     self.verbose = verbose
     self.log_churn = log_churn
 
