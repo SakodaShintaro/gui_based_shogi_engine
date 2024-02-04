@@ -86,15 +86,8 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     self.max_noops = 30
     self.parallel_eval = True
     self.num_eval_envs = 100
-    self.num_train_envs = 1
     self.eval_one_to_one = True
 
-    self.train_envs = [
-        self.create_environment_fn() for i in range(self.num_train_envs)
-    ]
-    self.train_state = None
-    self._agent.reset_all(self._initialize_episode(self.train_envs))
-    self._agent.cache_train_state()
     self.game_name = game_name.lower().replace('_', '').replace(' ', '')
 
   def _run_one_phase(self,
@@ -339,22 +332,23 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     """
     # Perform the training phase, during which the agent learns.
     self._agent.eval_mode = False
-    self._agent.restore_train_state()
     start_time = time.time()
+    train_envs = [self.create_environment_fn()]  # means num_train_envs=1
+
     (
         number_steps,
         sum_returns,
         num_episodes,
-        self.train_state,
-        self.train_envs,
+        _,
+        _,
     ) = self._run_one_phase(
-        self.train_envs,
+        train_envs,
         self._training_steps,
         max_episodes=None,
         statistics=statistics,
         run_mode_str='train',
-        needs_reset=self.train_state is None,
-        resume_state=self.train_state,
+        needs_reset=True,
+        resume_state=None,
     )
     average_return = sum_returns / num_episodes if num_episodes > 0 else 0.0
     statistics.append({'train_average_return': average_return})
