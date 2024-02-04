@@ -71,15 +71,8 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     super().__init__(
         base_dir, create_agent_fn, create_environment_fn=create_environment_fn)
 
-    self._num_iterations = int(self._num_iterations)
-    logging.info(f"self._num_iterations: {self._num_iterations}")
-    self._start_iteration = int(self._start_iteration)
-    logging.info(f"self._start_iteration: {self._start_iteration}")
-
-    self._num_eval_episodes = 100
-
     self.num_steps = 0
-    self.total_steps = self._training_steps * self._num_iterations
+    self.total_steps = self._training_steps
     logging.info(f"self.total_steps: {self.total_steps}")
     self.create_environment_fn = create_env_wrapper(create_environment_fn)
 
@@ -395,7 +388,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     _, sum_returns, num_episodes, _, _ = self._run_one_phase(
         eval_envs,
         steps=None,
-        max_episodes=self._num_eval_episodes,
+        max_episodes=self.num_eval_envs,
         statistics=statistics,
         needs_reset=True,
         resume_state=None,
@@ -489,15 +482,9 @@ class DataEfficientAtariRunner(run_experiment.Runner):
   def run_experiment(self):
     """Runs a full experiment, spread over multiple iterations."""
     logging.info('Beginning training...')
-    if self._num_iterations <= self._start_iteration:
-      logging.warning('num_iterations (%d) < start_iteration(%d)',
-                      self._num_iterations, self._start_iteration)
-      return
-
-    for iteration in range(self._start_iteration, self._num_iterations):
-      statistics = self._run_one_iteration(iteration)
-      self._log_experiment(iteration, statistics)
-      self._checkpoint_experiment(iteration)
+    statistics = self._run_one_iteration(iteration=0)
+    self._log_experiment(iteration=0, statistics=statistics)
+    self._checkpoint_experiment(iteration=0)
     self._summary_writer.flush()
 
 
