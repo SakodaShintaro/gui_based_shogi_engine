@@ -28,6 +28,15 @@ import jax
 import numpy as np
 import tensorflow as tf
 from .normalize_score import normalize_score
+import gym
+
+
+def create_environment(game_name: str):
+  full_game_name = f'{game_name}NoFrameskip-v4'
+  env = gym.make(full_game_name, full_action_space=True)
+  env = env.env
+  env = atari_lib.AtariPreprocessing(env)
+  return env
 
 
 def create_env_wrapper(create_env_fn):
@@ -57,7 +66,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
   ):
     """Specify the number of evaluation episodes."""
     create_environment_fn = functools.partial(
-        atari_lib.create_atari_environment, game_name=game_name
+        create_environment, game_name=game_name
     )
     super().__init__(
         base_dir, create_agent_fn, create_environment_fn=create_environment_fn)
