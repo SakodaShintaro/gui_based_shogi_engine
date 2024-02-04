@@ -72,8 +72,6 @@ class DataEfficientAtariRunner(run_experiment.Runner):
         base_dir, create_agent_fn, create_environment_fn=create_environment_fn)
 
     self.num_steps = 0
-    self.total_steps = self._training_steps
-    logging.info(f"self.total_steps: {self.total_steps}")
     self.create_environment_fn = create_env_wrapper(create_environment_fn)
 
     self.max_noops = 30
@@ -362,12 +360,13 @@ class DataEfficientAtariRunner(run_experiment.Runner):
         'Average training steps per second: %.2f', average_steps_per_second
     )
     self._agent.cache_train_state()
-    return (
-        num_episodes,
-        average_return,
-        average_steps_per_second,
-        human_norm_ret,
-    )
+
+    with self._summary_writer.as_default():
+      iteration = 0
+      tf.summary.scalar('Train/NumEpisodes', num_episodes, step=iteration)
+      tf.summary.scalar('Train/AverageReturns', average_return, step=iteration)
+      tf.summary.scalar('Train/AverageNormalizedScore', human_norm_ret, step=iteration)
+      tf.summary.scalar('Train/AverageStepsPerSecond', average_steps_per_second, step=iteration)
 
   def _run_eval_phase(self, statistics):
     """Run evaluation phase.
@@ -407,32 +406,12 @@ class DataEfficientAtariRunner(run_experiment.Runner):
         'Average normalized return per evaluation episode: %.2f',
         human_norm_return,
     )
-    return num_episodes, average_return, human_norm_return
 
-  def _run_one_iteration(self, iteration):
-    """Runs one iteration of agent/environment interaction."""
-    statistics = iteration_statistics.IterationStatistics()
-    logging.info('Starting iteration %d', iteration)
-    (
-        num_episodes_train,
-        average_reward_train,
-        average_steps_per_second,
-        norm_score_train,
-    ) = self._run_train_phase(statistics)
-    num_episodes_eval, average_reward_eval, human_norm_eval = (
-        self._run_eval_phase(statistics)
-    )
-    self._save_tensorboard_summaries(
-        iteration,
-        num_episodes_train,
-        average_reward_train,
-        norm_score_train,
-        num_episodes_eval,
-        average_reward_eval,
-        human_norm_eval,
-        average_steps_per_second,
-    )
-    return statistics.data_lists
+    with self._summary_writer.as_default():
+      iteration=0
+      tf.summary.scalar('Eval/NumEpisodes', num_episodes, step=iteration)
+      tf.summary.scalar('Eval/AverageReturns', average_return, step=iteration)
+      tf.summary.scalar('Eval/NormalizedScore', human_norm_return, step=iteration)
 
   def _maybe_save_single_summary(self,
                                  iteration,
@@ -448,41 +427,17 @@ class DataEfficientAtariRunner(run_experiment.Runner):
         tf.summary.scalar(
             prefix + 'EpisodeNormalizedScore', normalized_score, step=iteration)
 
-  def _save_tensorboard_summaries(self, iteration, num_episodes_train,
-                                  average_reward_train, norm_score_train,
-                                  num_episodes_eval, average_reward_eval,
-                                  norm_score_eval, average_steps_per_second):
-    """Save statistics as tensorboard summaries.
-
-    Args:
-      iteration: int, The current iteration number.
-      num_episodes_train: int, number of training episodes run.
-      average_reward_train: float, The average training reward.
-      norm_score_train: float, average training normalized score.
-      num_episodes_eval: int, number of evaluation episodes run.
-      average_reward_eval: float, The average evaluation reward.
-      norm_score_eval: float, average eval normalized score.
-      average_steps_per_second: float, The average number of steps per second.
-    """
-    with self._summary_writer.as_default():
-      tf.summary.scalar('Train/NumEpisodes', num_episodes_train, step=iteration)
-      tf.summary.scalar(
-          'Train/AverageReturns', average_reward_train, step=iteration)
-      tf.summary.scalar(
-          'Train/AverageNormalizedScore', norm_score_train, step=iteration)
-      tf.summary.scalar(
-          'Train/AverageStepsPerSecond',
-          average_steps_per_second,
-          step=iteration)
-      tf.summary.scalar('Eval/NumEpisodes', num_episodes_eval, step=iteration)
-      tf.summary.scalar(
-          'Eval/AverageReturns', average_reward_eval, step=iteration)
-      tf.summary.scalar('Eval/NormalizedScore', norm_score_eval, step=iteration)
-
   def run_experiment(self):
     """Runs a full experiment, spread over multiple iterations."""
     logging.info('Beginning training...')
-    statistics = self._run_one_iteration(iteration=0)
+    iteration = 0
+
+    statistics = iteration_statistics.IterationStatistics()
+    logging.info('Starting iteration %d', iteration)
+    self._run_train_phase(statistics)
+    self._run_eval_phase(statistics)
+
+    statistics = statistics.data_lists
     self._log_experiment(iteration=0, statistics=statistics)
     self._checkpoint_experiment(iteration=0)
     self._summary_writer.flush()
