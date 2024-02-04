@@ -21,13 +21,3 @@ python3 -m bbf.train \
     --base_dir=./bbf_result_$(date +%Y%m%d_%H%M%S) \
     --run_number=1
 ```
-
-違うゲーム, 違うステップ数
-```bash
-python3 -m bbf.train \
-    --agent=BBF \
-    --gin_files=bbf/configs/BBF.gin \
-    --base_dir=./bbf_result_$(date +%Y%m%d_%H%M%S) \
-    --run_number=1 \
-    --gin_bindings="Runner.training_steps=100000", "DataEfficientAtariRunner.game_name=ChopperCommand"
-```

@@ -39,8 +39,10 @@ def create_environment(game_name: str):
   return env
 
 
-def create_env_wrapper(create_env_fn):
-
+def create_env_wrapper(game_name: str):
+  create_env_fn = functools.partial(
+      create_environment, game_name=game_name
+  )
   def inner_create(*args, **kwargs):
     env = create_env_fn(*args, **kwargs)
     env.cum_length = 0
@@ -62,9 +64,9 @@ class DataEfficientAtariRunner(run_experiment.Runner):
       self,
       base_dir,
       create_agent_fn,
-      game_name=None,
   ):
     """Specify the number of evaluation episodes."""
+    game_name = "Breakout"  # dummy
     create_environment_fn = functools.partial(
         create_environment, game_name=game_name
     )
@@ -72,14 +74,11 @@ class DataEfficientAtariRunner(run_experiment.Runner):
         base_dir, create_agent_fn, create_environment_fn=create_environment_fn)
 
     self.num_steps = 0
-    self.create_environment_fn = create_env_wrapper(create_environment_fn)
 
     self.max_noops = 30
     self.parallel_eval = True
     self.num_eval_envs = 100
     self.eval_one_to_one = True
-
-    self.game_name = game_name.lower().replace('_', '').replace(' ', '')
 
   def _run_one_phase(self,
                      envs,
@@ -87,6 +86,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
                      max_episodes,
                      statistics,
                      run_mode_str,
+                     game_name: str,
                      needs_reset=False,
                      one_to_one=False,
                      resume_state=None):
@@ -125,6 +125,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
         needs_reset=needs_reset,
         resume_state=resume_state,
         max_steps=steps,
+        game_name=game_name,
     )
 
     for episode_length, episode_return in zip(episode_lengths, episode_returns):
@@ -183,6 +184,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
 
   def _run_parallel(self,
                     envs,
+                    game_name: str,
                     episodes=None,
                     max_steps=None,
                     one_to_one=False,
@@ -262,7 +264,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
           envs[env_id].cum_length = 0
           envs[env_id].cum_reward = 0
 
-          human_norm_ret = normalize_score(cum_rewards[-1], self.game_name)
+          human_norm_ret = normalize_score(cum_rewards[-1], game_name)
 
           print(f'Steps executed: {total_steps} ' +
                 f'Num episodes: {len(cum_rewards)} ' +
@@ -270,7 +272,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
                 f'Return: {cum_rewards[-1]:4.1f} ' +
                 f'Normalized Return: {np.round(human_norm_ret, 3)}')
           self._maybe_save_single_summary(self.num_steps + total_steps,
-                                          cum_rewards[-1], cum_lengths[-1])
+                                          cum_rewards[-1], cum_lengths[-1], game_name)
 
           if one_to_one:
             new_obses = delete_ind_from_array(new_obses, b, axis=1)
@@ -308,7 +310,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
              cum_lengths)
     return cum_lengths, cum_rewards, state, envs
 
-  def _run_train_phase(self, statistics):
+  def _run_train_phase(self, game_name: str, iteration: int, statistics):
     """Run training phase.
 
     Args:
@@ -324,7 +326,8 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     # Perform the training phase, during which the agent learns.
     self._agent.eval_mode = False
     start_time = time.time()
-    train_envs = [self.create_environment_fn()]  # means num_train_envs=1
+    create_env = create_env_wrapper(game_name)
+    train_envs = [create_env()]  # means num_train_envs=1
 
     (
         number_steps,
@@ -340,10 +343,11 @@ class DataEfficientAtariRunner(run_experiment.Runner):
         run_mode_str='train',
         needs_reset=True,
         resume_state=None,
+        game_name=game_name,
     )
     average_return = sum_returns / num_episodes if num_episodes > 0 else 0.0
     statistics.append({'train_average_return': average_return})
-    human_norm_ret = normalize_score(average_return, self.game_name)
+    human_norm_ret = normalize_score(average_return, game_name)
     statistics.append({'train_average_normalized_score': human_norm_ret})
     time_delta = time.time() - start_time
     average_steps_per_second = number_steps / time_delta
@@ -362,13 +366,12 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     self._agent.cache_train_state()
 
     with self._summary_writer.as_default():
-      iteration = 0
       tf.summary.scalar('Train/NumEpisodes', num_episodes, step=iteration)
       tf.summary.scalar('Train/AverageReturns', average_return, step=iteration)
       tf.summary.scalar('Train/AverageNormalizedScore', human_norm_ret, step=iteration)
       tf.summary.scalar('Train/AverageStepsPerSecond', average_steps_per_second, step=iteration)
 
-  def _run_eval_phase(self, statistics):
+  def _run_eval_phase(self, game_name: str, iteration: int, statistics):
     """Run evaluation phase.
 
     Args:
@@ -381,8 +384,9 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     """
     # Perform the evaluation phase -- no learning.
     self._agent.eval_mode = True
+    create_env = create_env_wrapper(game_name)
     eval_envs = [
-        self.create_environment_fn() for i in range(self.num_eval_envs)
+        create_env() for _ in range(self.num_eval_envs)
     ]
     _, sum_returns, num_episodes, _, _ = self._run_one_phase(
         eval_envs,
@@ -393,6 +397,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
         resume_state=None,
         one_to_one=self.eval_one_to_one,
         run_mode_str='eval',
+        game_name=game_name,
     )
     average_return = sum_returns / num_episodes if num_episodes > 0 else 0.0
     logging.info(
@@ -400,7 +405,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
         average_return,
     )
     statistics.append({'eval_average_return': average_return})
-    human_norm_return = normalize_score(average_return, self.game_name)
+    human_norm_return = normalize_score(average_return, game_name)
     statistics.append({'train_average_normalized_score': human_norm_return})
     logging.info(
         'Average normalized return per evaluation episode: %.2f',
@@ -408,39 +413,47 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     )
 
     with self._summary_writer.as_default():
-      iteration=0
-      tf.summary.scalar('Eval/NumEpisodes', num_episodes, step=iteration)
-      tf.summary.scalar('Eval/AverageReturns', average_return, step=iteration)
-      tf.summary.scalar('Eval/NormalizedScore', human_norm_return, step=iteration)
+      tf.summary.scalar(f'Eval/{game_name}/NumEpisodes', num_episodes, step=iteration)
+      tf.summary.scalar(f'Eval/{game_name}/AverageReturns', average_return, step=iteration)
+      tf.summary.scalar(f'Eval/{game_name}/NormalizedScore', human_norm_return, step=iteration)
 
   def _maybe_save_single_summary(self,
                                  iteration,
                                  ep_return,
                                  length,
+                                 game_name: str,
                                  save_if_eval=False):
     prefix = 'Train/' if not self._agent.eval_mode else 'Eval/'
     if not self._agent.eval_mode or save_if_eval:
       with self._summary_writer.as_default():
-        normalized_score = normalize_score(ep_return, self.game_name)
+        normalized_score = normalize_score(ep_return, game_name)
         tf.summary.scalar(prefix + 'EpisodeLength', length, step=iteration)
         tf.summary.scalar(prefix + 'EpisodeReturn', ep_return, step=iteration)
-        tf.summary.scalar(
-            prefix + 'EpisodeNormalizedScore', normalized_score, step=iteration)
+        tf.summary.scalar(prefix + 'EpisodeNormalizedScore', normalized_score, step=iteration)
 
   def run_experiment(self):
     """Runs a full experiment, spread over multiple iterations."""
     logging.info('Beginning training...')
-    iteration = 0
 
-    statistics = iteration_statistics.IterationStatistics()
-    logging.info('Starting iteration %d', iteration)
-    self._run_train_phase(statistics)
-    self._run_eval_phase(statistics)
+    game_name_list = [
+      "Breakout",
+      "Boxing",
+    ]
 
-    statistics = statistics.data_lists
-    self._log_experiment(iteration=0, statistics=statistics)
-    self._checkpoint_experiment(iteration=0)
-    self._summary_writer.flush()
+    for iteration, game_name_train in enumerate(game_name_list):
+      logging.info(f'Starting iteration {iteration} {game_name_train}')
+      statistics = iteration_statistics.IterationStatistics()
+
+      # train
+      self._run_train_phase(game_name_train, iteration, statistics)
+
+      # eval
+      for game_name_eval in game_name_list:
+        self._run_eval_phase(game_name_eval, iteration, statistics)
+
+      statistics = statistics.data_lists
+      self._log_experiment(iteration, statistics=statistics)
+      self._summary_writer.flush()
 
 
 def delete_ind_from_array(array, ind, axis=0):

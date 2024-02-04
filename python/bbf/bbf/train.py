@@ -127,25 +127,6 @@ def write_config(base_dir, seed, tag, agent):
   return clean_cfg
 
 
-def create_load_replay_dir(xm_params):
-  """Creates the directory for loading fixed replay data."""
-  problem_name, run_number = '', ''
-  for param, value in xm_params.items():
-    if param.endswith('game_name'):
-      problem_name = value
-    elif param.endswith('run_number'):
-      run_number = str(value)
-  replay_dir = FLAGS.load_replay_dir
-  if replay_dir:
-    if FLAGS.load_replay_number:
-      replay_number = str(FLAGS.load_replay_number)
-    else:
-      replay_number = run_number
-    replay_dir = os.path.join(replay_dir, problem_name, replay_number,
-                              'replay_logs')
-  return replay_dir
-
-
 def create_agent(
     sess,  # pylint: disable=unused-argument
     environment,

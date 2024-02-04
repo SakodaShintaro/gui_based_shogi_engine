@@ -121,6 +121,7 @@ atari_human_scores = {k.lower(): v for k, v in atari_human_scores.items()}
 
 
 def normalize_score(ret, game):
+  game = game.lower().replace('_', '').replace(' ', '')
   return (ret - atari_random_scores[game]) / (
       atari_human_scores[game] - atari_random_scores[game]
   )
