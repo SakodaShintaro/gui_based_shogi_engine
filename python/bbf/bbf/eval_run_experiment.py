@@ -87,9 +87,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
                      statistics,
                      run_mode_str,
                      game_name: str,
-                     needs_reset=False,
-                     one_to_one=False,
-                     resume_state=None):
+                     one_to_one=False):
     """Runs the agent/environment loop until a desired number of steps.
 
     We terminate precisely when the desired number of steps has been reached,
@@ -102,12 +100,9 @@ class DataEfficientAtariRunner(run_experiment.Runner):
       statistics: `IterationStatistics` object which records the experimental
         results.
       run_mode_str: str, describes the run mode for this agent.
-      needs_reset: bool, whether to reset all environments before starting.
       one_to_one: bool, whether to precisely match each episode in
         `max_episodes` to an environment in `envs`. True is faster but only
         works in some situations (e.g., evaluation).
-      resume_state: bool, whether to have the agent resume its prior state for
-        the current mode.
 
     Returns:
       Tuple containing the number of steps taken in this phase (int), the
@@ -122,8 +117,6 @@ class DataEfficientAtariRunner(run_experiment.Runner):
         episodes=max_episodes,
         envs=envs,
         one_to_one=one_to_one,
-        needs_reset=needs_reset,
-        resume_state=resume_state,
         max_steps=steps,
         game_name=game_name,
     )
@@ -187,9 +180,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
                     game_name: str,
                     episodes=None,
                     max_steps=None,
-                    one_to_one=False,
-                    needs_reset=True,
-                    resume_state=None):
+                    one_to_one=False):
     """Executes a full trajectory of the agent interacting with the environment.
 
     Args:
@@ -197,8 +188,6 @@ class DataEfficientAtariRunner(run_experiment.Runner):
       episodes: Optional int, how many episodes to run. Unbounded if None.
       max_steps: Optional int, how many steps to run. Unbounded if None.
       one_to_one: Bool, whether to couple each episode to an environment.
-      needs_reset: Bool, whether to reset environments before beginning.
-      resume_state: State tuple to resume.
 
     Returns:
       The number of steps taken and the total reward.
@@ -210,22 +199,16 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     # Create envs
     live_envs = list(range(len(envs)))
 
-    if needs_reset:
-      new_obs = self._initialize_episode(envs)
-      new_obses = np.zeros((2, len(envs), *self._agent.observation_shape, 1))
-      self._agent.reset_all(new_obs)
+    new_obs = self._initialize_episode(envs)
+    new_obses = np.zeros((2, len(envs), *self._agent.observation_shape, 1))
+    self._agent.reset_all(new_obs)
 
-      rewards = np.zeros((len(envs),))
-      terminals = np.zeros((len(envs),))
-      episode_end = np.zeros((len(envs),))
+    rewards = np.zeros((len(envs),))
+    terminals = np.zeros((len(envs),))
+    episode_end = np.zeros((len(envs),))
 
-      cum_rewards = []
-      cum_lengths = []
-    else:
-      assert resume_state is not None
-      (new_obses, rewards, terminals, episode_end, cum_rewards, cum_lengths) = (
-          resume_state
-      )
+    cum_rewards = []
+    cum_lengths = []
 
     total_steps = 0
     total_episodes = 0
@@ -341,8 +324,6 @@ class DataEfficientAtariRunner(run_experiment.Runner):
         max_episodes=None,
         statistics=statistics,
         run_mode_str='train',
-        needs_reset=True,
-        resume_state=None,
         game_name=game_name,
     )
     average_return = sum_returns / num_episodes if num_episodes > 0 else 0.0
@@ -393,8 +374,6 @@ class DataEfficientAtariRunner(run_experiment.Runner):
         steps=None,
         max_episodes=self.num_eval_envs,
         statistics=statistics,
-        needs_reset=True,
-        resume_state=None,
         one_to_one=self.eval_one_to_one,
         run_mode_str='eval',
         game_name=game_name,
