@@ -133,20 +133,6 @@ class DataEfficientAtariRunner(run_experiment.Runner):
       sum_returns += episode_return
       num_episodes += 1
       sys.stdout.flush()
-      if self._summary_writer is not None:
-        with self._summary_writer.as_default():
-          _ = (
-              tf.summary.scalar(
-                  'train_episode_returns',
-                  float(episode_return),
-                  step=self.num_steps,
-              ),
-          )
-          _ = tf.summary.scalar(
-              'train_episode_lengths',
-              float(episode_length),
-              step=self.num_steps,
-          )
     return step_count, sum_returns, num_episodes, state, envs
 
   def _initialize_episode(self, envs):
@@ -400,10 +386,9 @@ class DataEfficientAtariRunner(run_experiment.Runner):
                                  iteration,
                                  ep_return,
                                  length,
-                                 game_name: str,
-                                 save_if_eval=False):
+                                 game_name: str):
     prefix = 'Train/' if not self._agent.eval_mode else 'Eval/'
-    if not self._agent.eval_mode or save_if_eval:
+    if not self._agent.eval_mode:
       with self._summary_writer.as_default():
         normalized_score = normalize_score(ep_return, game_name)
         tf.summary.scalar(prefix + 'EpisodeLength', length, step=iteration)
