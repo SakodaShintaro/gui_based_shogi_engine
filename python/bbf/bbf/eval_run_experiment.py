@@ -80,61 +80,6 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     self.num_eval_envs = 100
     self.eval_one_to_one = True
 
-  def _run_one_phase(self,
-                     envs,
-                     steps,
-                     max_episodes,
-                     statistics,
-                     run_mode_str,
-                     game_name: str,
-                     one_to_one=False):
-    """Runs the agent/environment loop until a desired number of steps.
-
-    We terminate precisely when the desired number of steps has been reached,
-    unlike some other implementations.
-
-    Args:
-      envs: environments to use in this phase.
-      steps: int, how many steps to run in this phase (or None).
-      max_episodes: int, maximum number of episodes to generate in this phase.
-      statistics: `IterationStatistics` object which records the experimental
-        results.
-      run_mode_str: str, describes the run mode for this agent.
-      one_to_one: bool, whether to precisely match each episode in
-        `max_episodes` to an environment in `envs`. True is faster but only
-        works in some situations (e.g., evaluation).
-
-    Returns:
-      Tuple containing the number of steps taken in this phase (int), the
-      sum of
-        returns (float), and the number of episodes performed (int).
-    """
-    step_count = 0
-    num_episodes = 0
-    sum_returns = 0.
-
-    (episode_lengths, episode_returns, state, envs) = self._run_parallel(
-        episodes=max_episodes,
-        envs=envs,
-        one_to_one=one_to_one,
-        max_steps=steps,
-        game_name=game_name,
-    )
-
-    for episode_length, episode_return in zip(episode_lengths, episode_returns):
-      statistics.append({
-          '{}_episode_lengths'.format(run_mode_str): episode_length,
-          '{}_episode_returns'.format(run_mode_str): episode_return
-      })
-      if run_mode_str == 'train':
-        # we use one extra frame at the starting
-        self.num_steps += episode_length
-      step_count += episode_length
-      sum_returns += episode_return
-      num_episodes += 1
-      sys.stdout.flush()
-    return step_count, sum_returns, num_episodes, state, envs
-
   def _initialize_episode(self, envs):
     """Initialization for a new episode.
 
@@ -275,9 +220,7 @@ class DataEfficientAtariRunner(run_experiment.Runner):
       ):
         break
 
-    state = (new_obses, rewards, terminals, episode_end, cum_rewards,
-             cum_lengths)
-    return cum_lengths, cum_rewards, state, envs
+    return cum_lengths, cum_rewards
 
   def _run_train_phase(self, game_name: str, iteration: int, statistics):
     """Run training phase.
@@ -298,20 +241,28 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     create_env = create_env_wrapper(game_name)
     train_envs = [create_env()]  # means num_train_envs=1
 
-    (
-        number_steps,
-        sum_returns,
-        num_episodes,
-        _,
-        _,
-    ) = self._run_one_phase(
-        train_envs,
-        self._training_steps,
-        max_episodes=None,
-        statistics=statistics,
-        run_mode_str='train',
+    episode_lengths, episode_returns = self._run_parallel(
+        envs=train_envs,
         game_name=game_name,
+        episodes=None,
+        max_steps=self._training_steps,
+        one_to_one=False,
     )
+
+    number_steps = 0
+    num_episodes = 0
+    sum_returns = 0.
+
+    for episode_length, episode_return in zip(episode_lengths, episode_returns):
+      statistics.append({
+          'train_episode_lengths': episode_length,
+          'train_episode_returns': episode_return
+      })
+      self.num_steps += episode_length
+      number_steps += episode_length
+      sum_returns += episode_return
+      num_episodes += 1
+
     average_return = sum_returns / num_episodes if num_episodes > 0 else 0.0
     statistics.append({'train_average_return': average_return})
     human_norm_ret = normalize_score(average_return, game_name)
@@ -355,15 +306,28 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     eval_envs = [
         create_env() for _ in range(self.num_eval_envs)
     ]
-    _, sum_returns, num_episodes, _, _ = self._run_one_phase(
-        eval_envs,
-        steps=None,
-        max_episodes=self.num_eval_envs,
-        statistics=statistics,
-        one_to_one=self.eval_one_to_one,
-        run_mode_str='eval',
+
+    episode_lengths, episode_returns = self._run_parallel(
+        envs=eval_envs,
         game_name=game_name,
+        episodes=self.num_eval_envs,
+        max_steps=None,
+        one_to_one=self.eval_one_to_one,
     )
+
+    step_count = 0
+    num_episodes = 0
+    sum_returns = 0.
+
+    for episode_length, episode_return in zip(episode_lengths, episode_returns):
+      statistics.append({
+          'eval_episode_lengths': episode_length,
+          'eval_episode_returns': episode_return
+      })
+      step_count += episode_length
+      sum_returns += episode_return
+      num_episodes += 1
+
     average_return = sum_returns / num_episodes if num_episodes > 0 else 0.0
     logging.info(
         'Average undiscounted return per evaluation episode: %.2f',
