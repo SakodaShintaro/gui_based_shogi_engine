@@ -16,13 +16,11 @@
 """Runner for evaluating using a fixed number of episodes."""
 
 import functools
-import sys
 import time
 
 from absl import logging
 from dopamine.discrete_domains import atari_lib
 from dopamine.discrete_domains import iteration_statistics
-from dopamine.discrete_domains import run_experiment
 import gin
 import jax
 import numpy as np
@@ -53,7 +51,7 @@ def create_env_wrapper(game_name: str):
 
 
 @gin.configurable
-class DataEfficientAtariRunner(run_experiment.Runner):
+class DataEfficientAtariRunner:
   """Runner for evaluating using a fixed number of episodes rather than steps.
 
   Also restricts data collection to a strict cap,
@@ -70,13 +68,16 @@ class DataEfficientAtariRunner(run_experiment.Runner):
     create_environment_fn = functools.partial(
         create_environment, game_name=game_name
     )
-    super().__init__(
-        base_dir, create_agent_fn, create_environment_fn=create_environment_fn)
-
     self.num_steps = 0
 
+    dummy_env = create_environment_fn()
+    self._agent = create_agent_fn(None, dummy_env,
+                                  summary_writer=base_dir)
+    self._summary_writer = self._agent.summary_writer
+    self._training_steps = 10000
+    self._max_steps_per_episode = 27000
+    self._clip_rewards = True
     self.max_noops = 30
-    self.parallel_eval = True
     self.num_eval_envs = 100
     self.eval_one_to_one = True
 
@@ -379,8 +380,6 @@ class DataEfficientAtariRunner(run_experiment.Runner):
       for game_name_eval in game_name_list:
         self._run_eval_phase(game_name_eval, iteration, statistics)
 
-      statistics = statistics.data_lists
-      self._log_experiment(iteration, statistics=statistics)
       self._summary_writer.flush()
 
 

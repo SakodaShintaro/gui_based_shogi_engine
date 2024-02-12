@@ -26,8 +26,6 @@ bbf.agents.spr_agent.create_scaling_optimizer.eps = 0.00015
 # Sticky actions with probability 0.25, as suggested by (Machado et al., 2017).
 atari_lib.create_atari_environment.sticky_actions = True
 Runner.num_iterations = 200
-Runner.training_steps = 250000    # agent steps
-Runner.max_steps_per_episode = 27000    # agent steps
 
 bbf.replay_memory.subsequence_replay_buffer.PrioritizedJaxSubsequenceParallelEnvReplayBuffer.replay_capacity = 200000
 bbf.replay_memory.subsequence_replay_buffer.JaxSubsequenceParallelEnvReplayBuffer.replay_capacity = 200000
