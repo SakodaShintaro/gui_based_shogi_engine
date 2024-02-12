@@ -62,7 +62,6 @@ class DataEfficientAtariRunner:
       base_dir,
       create_agent_fn,
   ):
-    """Specify the number of evaluation episodes."""
     dummy_env = create_environment("Breakout")  # dummy to create agent
     self._agent = create_agent_fn(None, dummy_env,
                                   summary_writer=base_dir)
@@ -78,14 +77,6 @@ class DataEfficientAtariRunner:
     self.base_dir = base_dir
 
   def _initialize_episode(self, envs):
-    """Initialization for a new episode.
-
-    Args:
-      envs: Environments to initialize episodes for.
-
-    Returns:
-      action: int, the initial action chosen by the agent.
-    """
     observations = []
     for env in envs:
       initial_observation = env.reset()
@@ -113,6 +104,7 @@ class DataEfficientAtariRunner:
 
     Args:
       envs: Environments to step in.
+      game_name: Name of the game.
       episodes: Optional int, how many episodes to run. Unbounded if None.
       max_steps: Optional int, how many steps to run. Unbounded if None.
       one_to_one: Bool, whether to couple each episode to an environment.
@@ -227,8 +219,6 @@ class DataEfficientAtariRunner:
     return cum_lengths, cum_rewards
 
   def _run_train_phase(self, game_name: str, iteration: int):
-    """Run training phase.
-    """
     # Perform the training phase, during which the agent learns.
     self._agent.eval_mode = False
     start_time = time.time()
@@ -243,10 +233,13 @@ class DataEfficientAtariRunner:
         one_to_one=False,
     )
 
+    normalized_returns = [normalize_score(r, game_name) for r in episode_returns]
+
     # save as tsv
     df = pd.DataFrame({
       'episode_lengths': episode_lengths,
       'episode_returns': episode_returns,
+      'normalized_returns': normalized_returns,
     })
     df.loc['average'] = df.mean()
     df.to_csv(f'{self.base_dir}/train_{iteration:04d}_{game_name}.tsv', sep='\t')
@@ -273,8 +266,6 @@ class DataEfficientAtariRunner:
       tf.summary.scalar('Train/AverageStepsPerSecond', average_steps_per_second, step=iteration)
 
   def _run_eval_phase(self, game_name: str, iteration: int):
-    """Run evaluation phase.
-    """
     # Perform the evaluation phase -- no learning.
     self._agent.eval_mode = True
     create_env = create_env_wrapper(game_name)
@@ -290,10 +281,13 @@ class DataEfficientAtariRunner:
         one_to_one=self.eval_one_to_one,
     )
 
+    normalized_returns = [normalize_score(r, game_name) for r in episode_returns]
+
     # save as tsv
     df = pd.DataFrame({
       'episode_lengths': episode_lengths,
       'episode_returns': episode_returns,
+      'normalized_returns': normalized_returns,
     })
     df.loc['average'] = df.mean()
     df.to_csv(f'{self.base_dir}/eval_{iteration:04d}_{game_name}.tsv', sep='\t')
