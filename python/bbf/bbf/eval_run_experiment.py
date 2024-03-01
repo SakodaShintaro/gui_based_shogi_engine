@@ -314,17 +314,19 @@ class DataEfficientAtariRunner:
       "Boxing",
     ]
 
-    for iteration, game_name_train in enumerate(game_name_list):
-      print(f'Starting iteration {iteration} {game_name_train}')
+    for epoch in range(2):
+      for iteration, game_name_train in enumerate(game_name_list):
+        iteration += len(game_name_list) * epoch
+        print(f'Starting iteration {iteration} {game_name_train}')
 
-      # train
-      self._run_train_phase(game_name_train, iteration)
+        # train
+        self._run_train_phase(game_name_train, iteration)
 
-      # eval
-      for game_name_eval in game_name_list:
-        self._run_eval_phase(game_name_eval, iteration)
+        # eval
+        for game_name_eval in game_name_list:
+          self._run_eval_phase(game_name_eval, iteration)
 
-      self._summary_writer.flush()
+        self._summary_writer.flush()
 
 
 def delete_ind_from_array(array, ind, axis=0):
